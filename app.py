@@ -7,8 +7,6 @@ from options.data import get_options_view_df
 from streamlit_javascript import st_javascript
 
 screen_w = st_javascript("window.innerWidth")
-is_mobile = bool(screen_w) and screen_w <= 768
-
 is_mobile = False if screen_w is None else screen_w <= 768
 
 # Optional (auto spot pull)
@@ -278,13 +276,10 @@ def format_big(n):
 # =========================
 def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
     """
-    Horizontal Dealer GEX by Strike chart (Strike on Y, Dealer GEX on X).
+    Horizontal dealer hedge intensity by Strike.
 
-    IMPORTANT:
-    - Strike is rendered as an ORDINAL (banded) axis via strike_lbl to prevent the
-      "thin vertical stripes" issue that happens on a continuous y-axis.
-    - Spacing between bars is controlled by y-scale paddingInner/paddingOuter
-      + bar_size + chart height per strike.
+    X-axis: dealer hedge (shares per $1 move), approximated as:
+        shares_per_1d = dealer_gex / spot^2
     """
     if gex_all is None or gex_all.empty:
         st.warning("No GEX data to chart.")
@@ -319,10 +314,14 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
 
     # Create an ordinal/banded strike label (prevents hairline bars)
     g["strike_lbl"] = g["strike"].map(lambda x: f"{x:.2f}")
+    
+    # Convert Dealer GEX -> shares per $1 move
+    denom = max(float(spot) ** 2, 1e-9)
+    g["shares_per_1d"] = (g["dealer_gex"] / denom).replace([np.inf, -np.inf], np.nan)
 
-    g["bar_color"] = np.where(g["dealer_gex"] >= 0, "pos", "neg")
+    g["bar_color"] = np.where(g["shares_per_1d"] >= 0, "pos", "neg")
 
-    abs_max = float(np.abs(g["dealer_gex"]).max()) if len(g) else 1.0
+    abs_max = float(np.abs(g["shares_per_1d"]).max()) if len(g) else 1.0
     if not np.isfinite(abs_max) or abs_max <= 0:
         abs_max = 1.0
 
@@ -337,7 +336,7 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
     bar_size = int(np.clip(12 - (n / 12), 6, 10))
 
     x_axis = alt.Axis(
-        title="Dealer GEX",
+        title="Dealer Hedge (Shares per $1 move)",
         grid=True,
         gridColor=GRID_COLOR,
         gridOpacity=0.55,
@@ -361,8 +360,8 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
 
     bars = alt.Chart(g).mark_bar(size=bar_size).encode(
         x=alt.X(
-            "dealer_gex:Q",
-            title="Dealer GEX",
+            "shares_per_1d:Q",
+            title="Dealer Hedge(Shares per $1 move)",
             axis=x_axis,
             scale=alt.Scale(domain=x_domain),
         ),
@@ -385,7 +384,8 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
         ),
         tooltip=[
             alt.Tooltip("strike:Q", format=".2f", title="Strike"),
-            alt.Tooltip("dealer_gex:Q", format=",.0f", title="Dealer GEX"),
+            alt.Tooltip("shares_per_1d:Q", format=",.0f", title="Shares per $1"),
+            alt.Tooltip("dealer_gex:Q", format=",.0f", title="Dealer GEX (Raw)"),
         ],
     ).properties(height=chart_h)
 
@@ -411,7 +411,7 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
     )
 
     # Spot label on far right
-    spot_label_mult = 1.5 if is_mobile else 1.12
+    spot_label_mult = 1.22 if is_mobile else 1.12
     spot_label_df = pd.DataFrame({
         "x": [-abs_max * spot_label_mult], 
         "y": [spot_lbl], 
@@ -700,4 +700,3 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
-
