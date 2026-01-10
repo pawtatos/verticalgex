@@ -283,7 +283,7 @@ def format_big(n):
 # - POS bars = RED, NEG bars = GREEN
 # - Spot: dashed line across BOTH + and - sides (nearly full width) + label far right
 # =========================
-def render_chart(gex_all: pd.DataFrame, spot: float):
+def render_chart(gex_all: pd.DataFrame, spot: float, center_label: str = ""):
     if not ALTAIR_OK:
         st.warning("Altair not available.")
         return
@@ -293,19 +293,25 @@ def render_chart(gex_all: pd.DataFrame, spot: float):
 
     g0 = gex_all.copy()
     g0["strike"] = pd.to_numeric(g0["strike"], errors="coerce")
-    g0 = g0.dropna(subset=["strike"]).sort_values("strike").reset_index(drop=True)
+    g0["dealer_gex"] = pd.to_numeric(g0["dealer_gex"], errors="coerce")
+    g0 = g0.dropna(subset=["strike", "dealer_gex"]).sort_values("strike").reset_index(drop=True)
     if g0.empty:
         st.warning("No valid strikes.")
         return
 
+    # window around spot
     strikes = g0["strike"].to_numpy()
     idx = int(np.argmin(np.abs(strikes - spot)))
     lo = max(idx - STRIKES_AROUND_SPOT, 0)
     hi = min(idx + STRIKES_AROUND_SPOT + 1, len(strikes))
     g = g0.iloc[lo:hi].copy().sort_values("strike").reset_index(drop=True)
+    if g.empty:
+        st.warning("No strikes in window.")
+        return
 
-    abs_max = float(np.abs(g["dealer_gex"]).max()) if not g.empty else 1.0
-    if abs_max <= 0:
+    # scale bounds
+    abs_max = float(np.abs(g["dealer_gex"]).max())
+    if not np.isfinite(abs_max) or abs_max <= 0:
         abs_max = 1.0
 
     # X axis: POS -> NEG (left -> right)
@@ -314,29 +320,44 @@ def render_chart(gex_all: pd.DataFrame, spot: float):
     # POS=RED, NEG=GREEN
     g["bar_color"] = np.where(g["dealer_gex"] >= 0, "pos", "neg")
 
+    # ---- readability tuning (reduces “clustered” look) ----
+    n = len(g)
+    # height scales with number of strikes shown
+    chart_h = int(np.clip(n * 14, 460, 860))
+    # thicker bars when there are fewer strikes; slightly thinner when many
+    bar_size = int(np.clip(18 - (n / 8), 8, 14))
+
     bg = "#2a2a2a"
     grid = "#3c3c3c"
     axis_label = "#e6e6e6"
 
-    bars = alt.Chart(g).mark_bar(size=9).encode(
+    bars = alt.Chart(g).mark_bar(size=bar_size).encode(
         x=alt.X(
             "dealer_gex:Q",
             scale=alt.Scale(domain=x_domain),
             axis=alt.Axis(
-                title="",
+                title="Dealer GEX",
+                titleColor=axis_label,
+                titleFontSize=12,
+                labelColor=axis_label,
+                labelExpr="replace(format(datum.value, '~s'), 'k', 'K')",
                 grid=True,
                 gridColor=grid,
                 gridOpacity=0.8,
                 ticks=False,
-                labelColor=axis_label,
-                labelExpr="replace(format(datum.value, '~s'), 'k', 'K')",
             ),
         ),
         y=alt.Y(
-            "strike:O",
-            sort="ascending",
-            scale=alt.Scale(reverse=True),  # small bottom, large top
-            axis=alt.Axis(title="", ticks=False, labelColor=axis_label, format=".2f"),
+            "strike:Q",
+            scale=alt.Scale(reverse=True, paddingInner=0.25, paddingOuter=0.15),
+            axis=alt.Axis(
+                title="Strike",
+                titleColor=axis_label,
+                titleFontSize=12,
+                labelColor=axis_label,
+                ticks=False,
+                format=".2f",
+            ),
         ),
         color=alt.Color(
             "bar_color:N",
@@ -347,16 +368,15 @@ def render_chart(gex_all: pd.DataFrame, spot: float):
             alt.Tooltip("strike:Q", format=".2f", title="Strike"),
             alt.Tooltip("dealer_gex:Q", format=",.0f", title="Dealer GEX"),
         ],
-    ).properties(height=600)
+    ).properties(height=chart_h)
 
     zero_line = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(
         color="#8a8a8a", opacity=0.9, strokeWidth=2
     ).encode(x="x:Q")
 
-    # Spot line: snap to nearest displayed strike (Y is ordinal)
+    # Spot line: snap to nearest displayed strike
     spot_strike = float(g.loc[(g["strike"] - spot).abs().idxmin(), "strike"])
 
-    # Dashed spot line segment spanning BOTH + and - (nearly full width, slightly inset)
     spot_line_df = pd.DataFrame({
         "x1": [ abs_max * 0.985],   # near left edge (positive side)
         "x2": [-abs_max * 0.985],   # near right edge (negative side)
@@ -370,10 +390,9 @@ def render_chart(gex_all: pd.DataFrame, spot: float):
     ).encode(
         x=alt.X("x1:Q"),
         x2="x2:Q",
-        y=alt.Y("y:O", sort="ascending", scale=alt.Scale(reverse=True))
+        y=alt.Y("y:Q", scale=alt.Scale(reverse=True))
     )
 
-    # Spot label: push past right edge so it hugs the border
     spot_text = alt.Chart(
         pd.DataFrame({
             "x": [-abs_max * 1.03],
@@ -389,17 +408,42 @@ def render_chart(gex_all: pd.DataFrame, spot: float):
         fontWeight="bold",
     ).encode(
         x="x:Q",
-        y=alt.Y("y:O", sort="ascending", scale=alt.Scale(reverse=True)),
+        y=alt.Y("y:Q", scale=alt.Scale(reverse=True)),
         text="t:N",
     )
 
+    # ---- Center overlay label (Ticker + Expiry/DTE) ----
+    if center_label:
+        # center Y: nearest strike to the median strike in the displayed window
+        mid = float(np.median(g["strike"].to_numpy()))
+        center_y = float(g.loc[(g["strike"] - mid).abs().idxmin(), "strike"])
+
+        center_text = alt.Chart(
+            pd.DataFrame({"x": [0.0], "y": [center_y], "t": [center_label]})
+        ).mark_text(
+            align="center",
+            baseline="middle",
+            color="white",
+            fontSize=18,
+            fontWeight="bold",
+            opacity=0.95,
+        ).encode(
+            x="x:Q",
+            y=alt.Y("y:Q", scale=alt.Scale(reverse=True)),
+            text="t:N",
+        )
+        layers = [bars, zero_line, spot_line, spot_text, center_text]
+    else:
+        layers = [bars, zero_line, spot_line, spot_text]
+
     chart = (
-        alt.layer(bars, zero_line, spot_line, spot_text)
+        alt.layer(*layers)
         .configure(background=bg)
         .configure_view(strokeWidth=0)
     )
 
     st.altair_chart(chart, use_container_width=True)
+
 
 
 # =========================
@@ -605,6 +649,6 @@ with left:
             {"label": "ZeroGamma", "value": zg_disp},
         ]
     )
-
+center_label = f"{ticker} - {expiry_display}"
 with right:
-    render_chart(gex_all=gex_all, spot=float(spot))
+    render_chart(gex_all=gex_all, spot=float(spot), center_label=center_label)
