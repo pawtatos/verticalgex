@@ -366,7 +366,11 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
             sort=alt.SortField(field="strike", order="descending"),
             axis=y_axis,
             # This is the KEY to more separation between bars
-            scale=alt.Scale(paddingInner=0.55, paddingOuter=0.30),
+            scale=alt.Scale(
+                paddingInner=0.55, 
+                paddingOuter=0.30,
+                reverse=True
+            ),
         ),
         color=alt.Color(
             "bar_color:N",
@@ -388,7 +392,7 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
     spot_row = g.loc[(g["strike"] - spot).abs().idxmin()]
     spot_lbl = str(spot_row["strike_lbl"])
 
-    spot_rule_df = pd.DataFrame({"x1": [abs_max * 1.05], "x2": [-abs_max * 1.05], "y": [spot_lbl]})
+    spot_rule_df = pd.DataFrame({"x1": [abs_max * 1.00], "x2": [-abs_max * 1.00], "y": [spot_lbl]})
     spot_rule = alt.Chart(spot_rule_df).mark_rule(
         strokeDash=[6, 6],
         strokeWidth=2,
