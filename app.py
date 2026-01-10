@@ -26,9 +26,22 @@ except Exception:
 st.set_page_config(page_title="Gamma Exposure (GEX)", layout="wide")
 st.title("Gamma Exposure (GEX)")
 
+
+# =========================
+# Hidden defaults
+# =========================
 DEFAULT_RISK_FREE = 0.05
 DEFAULT_MULTIPLIER = 100
-STRIKES_AROUND_SPOT = 30  # +/- 30 strikes (by count)
+STRIKES_WINDOW_DEFAULT = 30  # only 30 strikes closest to spot
+
+# Chart sizing + styling
+CHART_BG = "#2b2b2b"         # dark gray background
+GRID_COLOR = "#3a3a3a"       # subtle gridlines
+AXIS_TEXT = "#cfcfcf"
+TITLE_TEXT = "#e6e6e6"
+
+# More background space so labels fit nicely
+CHART_PADDING = {"left": 20, "right": 30, "top": 20, "bottom": 20}
 
 
 # =========================
@@ -43,7 +56,7 @@ def fetch_chain(symbol: str) -> pd.DataFrame:
 
 
 # =========================
-# Cache: spot pull
+# Cache: spot pull (robust)
 # =========================
 @st.cache_data(ttl=30)
 def fetch_spot_yahoo(symbol: str) -> float:
@@ -55,27 +68,29 @@ def fetch_spot_yahoo(symbol: str) -> float:
     # fast_info
     try:
         fi = getattr(t, "fast_info", None)
-        if fi is not None:
-            v = fi.get("last_price", None)
-            if v is not None and float(v) > 0:
-                return float(v)
+        if fi:
+            for key in ["last_price", "lastPrice"]:
+                if key in fi and fi[key] is not None:
+                    v = float(fi[key])
+                    if v > 0:
+                        return v
     except Exception:
         pass
 
     # 1m intraday
     try:
         intraday = t.history(period="1d", interval="1m")
-        if isinstance(intraday, pd.DataFrame) and (not intraday.empty) and ("Close" in intraday.columns):
+        if intraday is not None and not intraday.empty and "Close" in intraday.columns:
             v = float(intraday["Close"].dropna().iloc[-1])
             if v > 0:
                 return v
     except Exception:
         pass
 
-    # daily
+    # daily close fallback
     hist = t.history(period="5d", interval="1d")
-    if not isinstance(hist, pd.DataFrame) or hist.empty or "Close" not in hist.columns:
-        raise RuntimeError("No price history returned.")
+    if hist is None or hist.empty or "Close" not in hist.columns:
+        raise RuntimeError("No price history returned (Yahoo may be blocking or symbol not found).")
     v = float(hist["Close"].dropna().iloc[-1])
     if v <= 0:
         raise RuntimeError("Invalid price returned from Yahoo.")
@@ -102,7 +117,7 @@ def to_years(expiry_str):
 
 
 # =========================
-# Snapshot UI tiles
+# Snapshot UI (INLINE HTML ONLY — reliable in Streamlit)
 # =========================
 def snap_cell(label: str, value: str, label_px=9, value_px=14, wrap_value=False):
     white_space = "normal" if wrap_value else "nowrap"
@@ -160,6 +175,277 @@ def tile_grid(items):
 
 
 # =========================
+# Levels / stats
+# =========================
+def compute_levels_by_strike(gex_df):
+    if gex_df.empty:
+        return {}
+    gex_df = gex_df.sort_values("strike").reset_index(drop=True)
+    net_gex = float(gex_df["dealer_gex"].sum())
+    put_wall = float(gex_df.loc[gex_df["dealer_gex"].idxmax(), "strike"])
+    call_wall = float(gex_df.loc[gex_df["dealer_gex"].idxmin(), "strike"])
+    return {"net_gex": net_gex, "put_wall": put_wall, "call_wall": call_wall}
+
+
+def compute_zero_gamma_level(gex_by_strike: pd.DataFrame):
+    if gex_by_strike is None or gex_by_strike.empty:
+        return None
+
+    g = gex_by_strike.sort_values("strike").reset_index(drop=True)
+    y = g["dealer_gex"].values
+    x = g["strike"].values
+
+    zeros = np.where(y == 0)[0]
+    if len(zeros) > 0:
+        return float(x[zeros[0]])
+
+    s = np.sign(y)
+    for i in range(1, len(s)):
+        if s[i] == 0:
+            return float(x[i])
+        if s[i - 1] == 0:
+            return float(x[i - 1])
+        if s[i] != s[i - 1]:
+            x0, y0 = x[i - 1], y[i - 1]
+            x1, y1 = x[i], y[i]
+            if (y1 - y0) == 0:
+                return float(x0)
+            return float(x0 + (0 - y0) * (x1 - x0) / (y1 - y0))
+    return None
+
+
+def compute_gex_snapshot_stats(per_exp_parts: list[pd.DataFrame]):
+    if not per_exp_parts:
+        return {"total_call_gex": 0.0, "total_put_gex": 0.0, "gex_ratio": None}
+
+    allp = pd.concat(per_exp_parts, ignore_index=True)
+    total_call_gex = float(allp["call_gex"].sum()) if "call_gex" in allp.columns else 0.0
+    total_put_gex = float(allp["put_gex"].sum()) if "put_gex" in allp.columns else 0.0
+    denom = total_call_gex + total_put_gex
+    gex_ratio = (total_call_gex / denom) if denom > 0 else None
+    return {"total_call_gex": total_call_gex, "total_put_gex": total_put_gex, "gex_ratio": gex_ratio}
+
+
+def compute_extreme_oi_for_summary(per_exp_parts: list[pd.DataFrame], gex_by_strike: pd.DataFrame):
+    out = {
+        "neg_strike": None,
+        "pos_strike": None,
+        "call_oi_at_neg": None,
+        "put_oi_at_pos": None,
+        "zero_gamma": None,
+    }
+    if not per_exp_parts or gex_by_strike is None or gex_by_strike.empty:
+        return out
+
+    allp = pd.concat(per_exp_parts, ignore_index=True)
+    oi_by_strike = allp.groupby("strike", as_index=False).agg(
+        call_oi=("call_oi", "sum"),
+        put_oi=("put_oi", "sum"),
+    )
+
+    gg = gex_by_strike.copy().sort_values("strike").reset_index(drop=True)
+    neg_strike = float(gg.loc[gg["dealer_gex"].idxmin(), "strike"])
+    pos_strike = float(gg.loc[gg["dealer_gex"].idxmax(), "strike"])
+
+    out["neg_strike"] = neg_strike
+    out["pos_strike"] = pos_strike
+
+    row_neg = oi_by_strike[oi_by_strike["strike"] == neg_strike]
+    row_pos = oi_by_strike[oi_by_strike["strike"] == pos_strike]
+    if not row_neg.empty:
+        out["call_oi_at_neg"] = float(row_neg["call_oi"].iloc[0])
+    if not row_pos.empty:
+        out["put_oi_at_pos"] = float(row_pos["put_oi"].iloc[0])
+
+    out["zero_gamma"] = compute_zero_gamma_level(gex_by_strike)
+    return out
+
+
+def format_big(n):
+    if n is None or (isinstance(n, float) and not np.isfinite(n)):
+        return "—"
+    return f"{n:,.0f}"
+
+
+# =========================
+# Chart (horizontal bars like your screenshot)
+# =========================
+def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
+    """
+    Horizontal Dealer GEX by Strike chart (Strike on Y, Dealer GEX on X).
+
+    IMPORTANT:
+    - Strike is rendered as an ORDINAL (banded) axis via strike_lbl to prevent the
+      "thin vertical stripes" issue that happens on a continuous y-axis.
+    - Spacing between bars is controlled by y-scale paddingInner/paddingOuter
+      + bar_size + chart height per strike.
+    """
+    if gex_all is None or gex_all.empty:
+        st.warning("No GEX data to chart.")
+        return
+
+    if not ALTAIR_OK:
+        st.warning("Altair not installed. Run: python -m pip install altair")
+        g = gex_all.copy()
+        g["dist"] = (g["strike"] - spot).abs()
+        g = (
+            g.sort_values("dist")
+            .head(int(STRIKES_WINDOW_DEFAULT))
+            .sort_values("strike")
+            .reset_index(drop=True)
+        )
+        st.bar_chart(g.set_index("strike")[["dealer_gex"]])
+        return
+
+    g = gex_all.copy()
+    g["strike"] = pd.to_numeric(g["strike"], errors="coerce")
+    g["dealer_gex"] = pd.to_numeric(g["dealer_gex"], errors="coerce")
+    g = g.dropna(subset=["strike", "dealer_gex"]).copy()
+
+    # only N strikes closest to spot
+    g["dist"] = (g["strike"] - spot).abs()
+    g = (
+        g.sort_values("dist")
+        .head(int(STRIKES_WINDOW_DEFAULT))
+        .sort_values("strike")
+        .reset_index(drop=True)
+    )
+
+    # Create an ordinal/banded strike label (prevents hairline bars)
+    g["strike_lbl"] = g["strike"].map(lambda x: f"{x:.2f}")
+
+    g["bar_color"] = np.where(g["dealer_gex"] >= 0, "pos", "neg")
+
+    abs_max = float(np.abs(g["dealer_gex"]).max()) if len(g) else 1.0
+    if not np.isfinite(abs_max) or abs_max <= 0:
+        abs_max = 1.0
+
+    # X axis domain: positive on the LEFT, negative on the RIGHT (matches your screenshot)
+    x_domain = [abs_max, -abs_max]
+
+    # ---------- Spacing controls ----------
+    n = len(g)
+    # Give each strike more vertical room so bars don't cluster
+    chart_h = int(np.clip(n * 22, 560, 1300))
+    # Make bars a bit thinner so there's visible gap between rows
+    bar_size = int(np.clip(12 - (n / 12), 6, 10))
+
+    x_axis = alt.Axis(
+        title="Dealer GEX",
+        grid=True,
+        gridColor=GRID_COLOR,
+        gridOpacity=0.55,
+        tickColor=GRID_COLOR,
+        labelColor=AXIS_TEXT,
+        titleColor=AXIS_TEXT,
+        domainColor=GRID_COLOR,
+        labelPadding=6,
+        ticks=False,
+        labelExpr="replace(format(datum.value, '~s'), 'k', 'K')",
+    )
+    y_axis = alt.Axis(
+        title="Strike",
+        grid=False,
+        labelColor=AXIS_TEXT,
+        titleColor=AXIS_TEXT,
+        tickColor=GRID_COLOR,
+        domainColor=GRID_COLOR,
+        ticks=False,
+    )
+
+    bars = alt.Chart(g).mark_bar(size=bar_size).encode(
+        x=alt.X(
+            "dealer_gex:Q",
+            title="Dealer GEX",
+            axis=x_axis,
+            scale=alt.Scale(domain=x_domain),
+        ),
+        y=alt.Y(
+            "strike_lbl:N",
+            title="Strike",
+            sort=alt.SortField(field="strike", order="descending"),
+            axis=y_axis,
+            # This is the KEY to more separation between bars
+            scale=alt.Scale(paddingInner=0.55, paddingOuter=0.30),
+        ),
+        color=alt.Color(
+            "bar_color:N",
+            scale=alt.Scale(domain=["pos", "neg"], range=["#D00000", "#00A000"]),
+            legend=None
+        ),
+        tooltip=[
+            alt.Tooltip("strike:Q", format=".2f", title="Strike"),
+            alt.Tooltip("dealer_gex:Q", format=",.0f", title="Dealer GEX"),
+        ],
+    ).properties(height=chart_h)
+
+    # Center zero line
+    zero_line = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(
+        color="#8a8a8a", opacity=0.9, strokeWidth=2
+    ).encode(x="x:Q")
+
+    # Spot line: snap to nearest displayed strike and run across the chart
+    spot_row = g.loc[(g["strike"] - spot).abs().idxmin()]
+    spot_lbl = str(spot_row["strike_lbl"])
+
+    spot_rule_df = pd.DataFrame({"x1": [abs_max * 1.05], "x2": [-abs_max * 1.05], "y": [spot_lbl]})
+    spot_rule = alt.Chart(spot_rule_df).mark_rule(
+        strokeDash=[6, 6],
+        strokeWidth=2,
+        opacity=0.9,
+        color="white"
+    ).encode(
+        x="x1:Q",
+        x2="x2:Q",
+        y=alt.Y("y:N", sort=alt.SortField(field="y", order="descending")),
+    )
+
+    # Spot label on far right
+    spot_label_df = pd.DataFrame({"x": [-abs_max * 1.12], "y": [spot_lbl], "label": [f"{spot:.2f}"]})
+    spot_label = alt.Chart(spot_label_df).mark_text(
+        align="right",
+        baseline="middle",
+        dx=8,
+        color="white",
+        fontSize=12,
+        fontWeight="bold"
+    ).encode(
+        x="x:Q",
+        y=alt.Y("y:N", sort=alt.SortField(field="y", order="descending")),
+        text="label:N"
+    )
+
+    # Title at the TOP of the chart (centered)
+    title_df = pd.DataFrame({"x": [0.0], "t": [chart_title]})
+    title_layer = alt.Chart(title_df).mark_text(
+        align="center",
+        baseline="top",
+        dy=-30,
+        color=TITLE_TEXT,
+        fontSize=16,
+        fontWeight="bold",
+        opacity=0.95,
+    ).encode(
+        x=alt.X("x:Q", scale=alt.Scale(domain=x_domain)),
+        y=alt.value(0),
+        text="t:N",
+    )
+
+    chart = (bars + zero_line + spot_rule + spot_label + title_layer).properties(
+        padding=CHART_PADDING
+    ).configure_view(
+        strokeWidth=0,
+        fill=CHART_BG,
+    ).configure(
+        background=CHART_BG
+    )
+
+    st.altair_chart(chart, use_container_width=True)
+
+
+
+
+# =========================
 # Expiry selection helpers
 # =========================
 def key_for_expiry(ticker: str, exp: str) -> str:
@@ -186,273 +472,13 @@ def set_all(ticker: str, expiries: list[str], value: bool):
 
 
 # =========================
-# Levels / stats
-# =========================
-def compute_levels_by_strike(gex_df: pd.DataFrame):
-    if not isinstance(gex_df, pd.DataFrame) or gex_df.empty:
-        return {}
-    gex_df = gex_df.sort_values("strike").reset_index(drop=True)
-    put_wall = float(gex_df.loc[gex_df["dealer_gex"].idxmax(), "strike"])
-    call_wall = float(gex_df.loc[gex_df["dealer_gex"].idxmin(), "strike"])
-    return {"put_wall": put_wall, "call_wall": call_wall}
-
-
-def compute_zero_gamma_level(gex_by_strike: pd.DataFrame):
-    if not isinstance(gex_by_strike, pd.DataFrame) or gex_by_strike.empty:
-        return None
-    g = gex_by_strike.sort_values("strike").reset_index(drop=True)
-    y = g["dealer_gex"].values
-    x = g["strike"].values
-    s = np.sign(y)
-    for i in range(1, len(s)):
-        if s[i] == 0:
-            return float(x[i])
-        if s[i - 1] == 0:
-            return float(x[i - 1])
-        if s[i] != s[i - 1]:
-            x0, y0 = x[i - 1], y[i - 1]
-            x1, y1 = x[i], y[i]
-            if (y1 - y0) == 0:
-                return float(x0)
-            return float(x0 + (0 - y0) * (x1 - x0) / (y1 - y0))
-    return None
-
-
-def compute_gex_ratio(per_exp_parts: list[pd.DataFrame]):
-    if per_exp_parts is None or len(per_exp_parts) == 0:
-        return None
-    allp = pd.concat(per_exp_parts, ignore_index=True)
-    total_call = float(allp["call_gex"].sum())
-    total_put = float(allp["put_gex"].sum())
-    denom = total_call + total_put
-    if denom <= 0:
-        return None
-    return total_call / denom
-
-
-def compute_extreme_oi(per_exp_parts: list[pd.DataFrame], gex_by_strike: pd.DataFrame):
-    out = {
-        "neg_strike": None,
-        "pos_strike": None,
-        "call_oi_at_neg": None,
-        "put_oi_at_pos": None,
-        "zero_gamma": None,
-    }
-    if per_exp_parts is None or len(per_exp_parts) == 0:
-        return out
-    if not isinstance(gex_by_strike, pd.DataFrame) or gex_by_strike.empty:
-        return out
-
-    allp = pd.concat(per_exp_parts, ignore_index=True)
-    oi_by_strike = allp.groupby("strike", as_index=False).agg(
-        call_oi=("call_oi", "sum"),
-        put_oi=("put_oi", "sum"),
-    )
-
-    gg = gex_by_strike.sort_values("strike").reset_index(drop=True)
-    out["neg_strike"] = float(gg.loc[gg["dealer_gex"].idxmin(), "strike"])
-    out["pos_strike"] = float(gg.loc[gg["dealer_gex"].idxmax(), "strike"])
-
-    rn = oi_by_strike[oi_by_strike["strike"] == out["neg_strike"]]
-    rp = oi_by_strike[oi_by_strike["strike"] == out["pos_strike"]]
-    if not rn.empty:
-        out["call_oi_at_neg"] = float(rn["call_oi"].iloc[0])
-    if not rp.empty:
-        out["put_oi_at_pos"] = float(rp["put_oi"].iloc[0])
-
-    out["zero_gamma"] = compute_zero_gamma_level(gex_by_strike)
-    return out
-
-
-def format_big(n):
-    if n is None:
-        return "—"
-    try:
-        if isinstance(n, float) and not np.isfinite(n):
-            return "—"
-        return f"{float(n):,.0f}"
-    except Exception:
-        return "—"
-
-
-# =========================
-# Chart
-# - NO title
-# - X: POS -> NEG (left -> right)
-# - Y: small bottom -> large top
-# - POS bars = RED, NEG bars = GREEN
-# - Spot: dashed line across BOTH + and - sides (nearly full width) + label far right
-# =========================
-def render_chart(gex_all: pd.DataFrame, spot: float, center_label: str = ""):
-    if not ALTAIR_OK:
-        st.warning("Altair not available.")
-        return
-    if gex_all is None or (not isinstance(gex_all, pd.DataFrame)) or gex_all.empty:
-        st.warning("No GEX data to chart.")
-        return
-
-    g0 = gex_all.copy()
-    g0["strike"] = pd.to_numeric(g0["strike"], errors="coerce")
-    g0["dealer_gex"] = pd.to_numeric(g0["dealer_gex"], errors="coerce")
-    g0 = g0.dropna(subset=["strike", "dealer_gex"]).sort_values("strike").reset_index(drop=True)
-    if g0.empty:
-        st.warning("No valid strikes.")
-        return
-
-    # window around spot
-    strikes = g0["strike"].to_numpy()
-    idx = int(np.argmin(np.abs(strikes - spot)))
-    lo = max(idx - STRIKES_AROUND_SPOT, 0)
-    hi = min(idx + STRIKES_AROUND_SPOT + 1, len(strikes))
-    g = g0.iloc[lo:hi].copy().sort_values("strike").reset_index(drop=True)
-    if g.empty:
-        st.warning("No strikes in window.")
-        return
-
-    # scale bounds
-    abs_max = float(np.abs(g["dealer_gex"]).max())
-    if not np.isfinite(abs_max) or abs_max <= 0:
-        abs_max = 1.0
-
-    # X axis: POS -> NEG (left -> right)
-    x_domain = [abs_max, -abs_max]
-
-    # POS=RED, NEG=GREEN
-    g["bar_color"] = np.where(g["dealer_gex"] >= 0, "pos", "neg")
-
-    # ---- readability tuning (reduces “clustered” look) ----
-    n = len(g)
-    # height scales with number of strikes shown
-    chart_h = int(np.clip(n * 14, 460, 860))
-    # thicker bars when there are fewer strikes; slightly thinner when many
-    bar_size = int(np.clip(18 - (n / 8), 8, 14))
-
-    bg = "#2a2a2a"
-    grid = "#3c3c3c"
-    axis_label = "#e6e6e6"
-
-    bars = alt.Chart(g).mark_bar(size=bar_size).encode(
-        x=alt.X(
-            "dealer_gex:Q",
-            scale=alt.Scale(domain=x_domain),
-            axis=alt.Axis(
-                title="Dealer GEX",
-                titleColor=axis_label,
-                titleFontSize=12,
-                labelColor=axis_label,
-                labelExpr="replace(format(datum.value, '~s'), 'k', 'K')",
-                grid=True,
-                gridColor=grid,
-                gridOpacity=0.8,
-                ticks=False,
-            ),
-        ),
-        y=alt.Y(
-            "strike:Q",
-            scale=alt.Scale(reverse=True, paddingInner=0.25, paddingOuter=0.15),
-            axis=alt.Axis(
-                title="Strike",
-                titleColor=axis_label,
-                titleFontSize=12,
-                labelColor=axis_label,
-                ticks=False,
-                format=".2f",
-            ),
-        ),
-        color=alt.Color(
-            "bar_color:N",
-            scale=alt.Scale(domain=["pos", "neg"], range=["#D00000", "#00A000"]),
-            legend=None,
-        ),
-        tooltip=[
-            alt.Tooltip("strike:Q", format=".2f", title="Strike"),
-            alt.Tooltip("dealer_gex:Q", format=",.0f", title="Dealer GEX"),
-        ],
-    ).properties(height=chart_h)
-
-    zero_line = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(
-        color="#8a8a8a", opacity=0.9, strokeWidth=2
-    ).encode(x="x:Q")
-
-    # Spot line: snap to nearest displayed strike
-    spot_strike = float(g.loc[(g["strike"] - spot).abs().idxmin(), "strike"])
-
-    spot_line_df = pd.DataFrame({
-        "x1": [ abs_max * 0.985],   # near left edge (positive side)
-        "x2": [-abs_max * 0.985],   # near right edge (negative side)
-        "y":  [spot_strike],
-    })
-    spot_line = alt.Chart(spot_line_df).mark_line(
-        color="white",
-        strokeDash=[6, 6],
-        strokeWidth=1.6,
-        opacity=0.9
-    ).encode(
-        x=alt.X("x1:Q"),
-        x2="x2:Q",
-        y=alt.Y("y:Q", scale=alt.Scale(reverse=True))
-    )
-
-    spot_text = alt.Chart(
-        pd.DataFrame({
-            "x": [-abs_max * 1.03],
-            "y": [spot_strike],
-            "t": [f"{spot:.2f}"]
-        })
-    ).mark_text(
-        align="right",
-        baseline="middle",
-        dx=8,
-        color="white",
-        fontSize=12,
-        fontWeight="bold",
-    ).encode(
-        x="x:Q",
-        y=alt.Y("y:Q", scale=alt.Scale(reverse=True)),
-        text="t:N",
-    )
-
-    # ---- Center overlay label (Ticker + Expiry/DTE) ----
-    if center_label:
-        # center Y: nearest strike to the median strike in the displayed window
-        mid = float(np.median(g["strike"].to_numpy()))
-        center_y = float(g.loc[(g["strike"] - mid).abs().idxmin(), "strike"])
-
-        center_text = alt.Chart(
-            pd.DataFrame({"x": [0.0], "y": [center_y], "t": [center_label]})
-        ).mark_text(
-            align="center",
-            baseline="middle",
-            color="white",
-            fontSize=18,
-            fontWeight="bold",
-            opacity=0.95,
-        ).encode(
-            x="x:Q",
-            y=alt.Y("y:Q", scale=alt.Scale(reverse=True)),
-            text="t:N",
-        )
-        layers = [bars, zero_line, spot_line, spot_text, center_text]
-    else:
-        layers = [bars, zero_line, spot_line, spot_text]
-
-    chart = (
-        alt.layer(*layers)
-        .configure(background=bg)
-        .configure_view(strokeWidth=0)
-    )
-
-    st.altair_chart(chart, use_container_width=True)
-
-
-
-# =========================
-# Main UI
+# Layout
 # =========================
 left, right = st.columns([1, 2])
 
 with left:
     ticker = st.text_input("Ticker", "SPY").upper().strip()
+
     bucket = st.radio("Expiration", ["Nearest expiration date", "All expiries"], horizontal=False)
 
     if not YF_OK:
@@ -465,7 +491,7 @@ with left:
 
         need = ["option_type", "expire_date", "strike", "open_interest", "imp_vol"]
         missing = [c for c in need if c not in raw.columns]
-        if len(missing) > 0:
+        if missing:
             st.error(f"Missing columns from feed: {missing}")
             st.write("Columns found:", list(raw.columns))
             st.stop()
@@ -500,13 +526,12 @@ with left:
 
         dte_map = dict(zip(exp_tbl["expiry_str"].astype(str), exp_tbl["DTE"].astype(float)))
         future_exp = exp_tbl.loc[exp_tbl["T"] > 0, "expiry_str"].astype(str).tolist()
-        all_expiries = future_exp if len(future_exp) > 0 else exp_tbl["expiry_str"].astype(str).tolist()
+        all_expiries = future_exp if future_exp else exp_tbl["expiry_str"].astype(str).tolist()
 
-        if len(all_expiries) == 0:
-            st.error("No expiries returned.")
+        if not all_expiries:
+            st.error("No expiries returned for this ticker.")
             st.stop()
 
-    # Choose expiries
     chosen_expiries = []
     next_expiry_used = ""
 
@@ -546,23 +571,20 @@ with left:
         chosen_expiries = [e for e in all_expiries if st.session_state.get(key_for_expiry(ticker, e), False)]
         st.caption(f"Selected: **{len(chosen_expiries)}** expiries")
 
-        if len(chosen_expiries) == 0:
+        if not chosen_expiries:
             st.info("Pick at least one expiry to compute GEX.")
             st.stop()
 
-    # =========================
-    # Compute GEX (sum across expiries)
-    # =========================
     with st.spinner("Computing GEX…"):
+        parts = []
         per_exp_parts = []
-        dealer_parts = []
 
         for exp in chosen_expiries:
             dfe = df[df["expiry_str"] == exp].copy()
             T = to_years(exp)
 
             dfe["gamma"] = dfe.apply(
-                lambda r0: bs_gamma(float(spot), float(r0["strike"]), float(T), DEFAULT_RISK_FREE, float(r0["iv"])),
+                lambda r0: bs_gamma(spot, r0["strike"], T, DEFAULT_RISK_FREE, r0["iv"]),
                 axis=1
             )
 
@@ -585,22 +607,22 @@ with left:
 
             gex = pd.merge(call_agg, put_agg, on="strike", how="outer").fillna(0)
 
-            gex["call_gex"] = (gex["call_gamma"] * gex["call_oi"]) * DEFAULT_MULTIPLIER * (float(spot) ** 2)
-            gex["put_gex"]  = (gex["put_gamma"]  * gex["put_oi"])  * DEFAULT_MULTIPLIER * (float(spot) ** 2)
+            gex["call_gex"] = (gex["call_gamma"] * gex["call_oi"]) * DEFAULT_MULTIPLIER * (spot ** 2)
+            gex["put_gex"] = (gex["put_gamma"] * gex["put_oi"]) * DEFAULT_MULTIPLIER * (spot ** 2)
             gex["dealer_gex"] = gex["put_gex"] - gex["call_gex"]
 
+            parts.append(gex[["strike", "dealer_gex"]])
             per_exp_parts.append(gex[["strike", "call_gex", "put_gex", "call_oi", "put_oi"]])
-            dealer_parts.append(gex[["strike", "dealer_gex"]])
 
-        gex_all = pd.concat(dealer_parts, ignore_index=True).groupby("strike", as_index=False)["dealer_gex"].sum()
+        gex_all = pd.concat(parts, ignore_index=True).groupby("strike", as_index=False)["dealer_gex"].sum()
         gex_all = gex_all.sort_values("strike").reset_index(drop=True)
 
         levels = compute_levels_by_strike(gex_all)
-        gex_ratio = compute_gex_ratio(per_exp_parts)
-        ext = compute_extreme_oi(per_exp_parts, gex_all)
+        snap = compute_gex_snapshot_stats(per_exp_parts)
+        levels_oi = compute_extreme_oi_for_summary(per_exp_parts, gex_all)
 
     # =========================
-    # Snapshot
+    # Snapshot + Levels tiles
     # =========================
     st.markdown("### Snapshot")
 
@@ -613,31 +635,32 @@ with left:
     else:
         dtes = [dte_map.get(e, np.nan) for e in chosen_expiries]
         dtes = [d for d in dtes if np.isfinite(d)]
-        if len(dtes) > 0:
+        if dtes:
             expiry_display = f"{len(chosen_expiries)} expiries (min {int(round(min(dtes)))} / max {int(round(max(dtes)))} DTE)"
         else:
             expiry_display = f"{len(chosen_expiries)} expiries"
 
+    gex_ratio = snap.get("gex_ratio", None)
     gex_ratio_disp = f"{gex_ratio:.2%}" if gex_ratio is not None else "—"
 
     tile_grid(
         items=[
             {"label": "Ticker", "value": ticker},
-            {"label": "Stock Price", "value": f"{float(spot):,.2f}"},
+            {"label": "Stock Price", "value": f"{spot:,.2f}"},
             {"label": "Expiry (DTE)", "value": expiry_display, "wrap": True},
             {"label": "GEX Ratio", "value": gex_ratio_disp},
-            {"label": "Call Wall", "value": f"{levels.get('call_wall', np.nan):.2f}" if levels else "—"},
-            {"label": "Put Wall", "value": f"{levels.get('put_wall', np.nan):.2f}" if levels else "—"},
+            {"label": "Call Wall", "value": f"{levels['call_wall']:.2f}"},
+            {"label": "Put Wall", "value": f"{levels['put_wall']:.2f}"},
         ]
     )
 
-    zg = ext.get("zero_gamma", None)
+    zg = levels_oi.get("zero_gamma", None)
     zg_disp = f"{zg:.2f}" if zg is not None else "—"
 
-    neg_strike = ext.get("neg_strike", None)
-    pos_strike = ext.get("pos_strike", None)
-    call_oi_neg = ext.get("call_oi_at_neg", None)
-    put_oi_pos = ext.get("put_oi_at_pos", None)
+    neg_strike = levels_oi.get("neg_strike", None)
+    pos_strike = levels_oi.get("pos_strike", None)
+    call_oi_neg = levels_oi.get("call_oi_at_neg", None)
+    put_oi_pos = levels_oi.get("put_oi_at_pos", None)
 
     neg_k = f"{neg_strike:.2f}" if neg_strike is not None else "—"
     pos_k = f"{pos_strike:.2f}" if pos_strike is not None else "—"
@@ -649,6 +672,16 @@ with left:
             {"label": "ZeroGamma", "value": zg_disp},
         ]
     )
-center_label = f"{ticker} - {expiry_display}"
+
 with right:
-    render_chart(gex_all=gex_all, spot=float(spot), center_label=center_label)
+    # Chart title shown inside chart (top)
+    if bucket == "Nearest expiration date" and next_expiry_used:
+        dte0 = dte_map.get(next_expiry_used, np.nan)
+        if np.isfinite(dte0):
+            chart_title = f"{ticker} - {next_expiry_used} ({int(round(dte0))} DTE)"
+        else:
+            chart_title = f"{ticker} - {next_expiry_used}"
+    else:
+        chart_title = f"{ticker} - All expiries"
+
+    render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
