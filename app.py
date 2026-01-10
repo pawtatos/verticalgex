@@ -689,17 +689,28 @@ with left:
     )
 
 with right:
-    # Chart title shown inside chart (top)
+    # Determine chart title correctly
     if bucket == "Nearest expiration date" and next_expiry_used:
-        dte0 = dte_map.get(next_expiry_used, np.nan)
+        exp = next_expiry_used
+
+    elif bucket == "All expiries" and len(chosen_expiries) == 1:
+        exp = chosen_expiries[0]
+
+    else:
+        exp = None
+
+    if exp:
+        dte0 = dte_map.get(exp, np.nan)
         if np.isfinite(dte0):
-            chart_title = f"{ticker} - {next_expiry_used} ({int(round(dte0))} DTE)"
+            chart_title = f"{ticker} - {exp} ({int(round(dte0))} DTE)"
         else:
-            chart_title = f"{ticker} - {next_expiry_used}"
+            chart_title = f"{ticker} - {exp}"
     else:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
+
 
 
 
