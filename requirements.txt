@@ -1,0 +1,7 @@
+streamlit>=1.32
+pandas>=2.0
+numpy>=1.24
+scipy>=1.10
+altair>=5.0
+yfinance>=0.2.30
+requests>=2.31
