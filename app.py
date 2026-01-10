@@ -411,7 +411,7 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
     )
 
     # Spot label on far right
-    spot_label_mult = 1.22 if is_mobile else 1.12
+    spot_label_mult = 1.30 if is_mobile else 1.12
     spot_label_df = pd.DataFrame({
         "x": [-abs_max * spot_label_mult], 
         "y": [spot_lbl], 
@@ -700,3 +700,4 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
