@@ -4,6 +4,12 @@ import numpy as np
 from math import log, sqrt
 from scipy.stats import norm
 from options.data import get_options_view_df
+from streamlit_javascript import st_javascript
+
+screen_w = st_javascript("window.innerWidth")
+is_mobile = bool(screen_w) and screen_w <= 768
+
+is_mobile = False if screen_w is None else screen_w <= 768
 
 # Optional (auto spot pull)
 try:
@@ -405,7 +411,12 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
     )
 
     # Spot label on far right
-    spot_label_df = pd.DataFrame({"x": [-abs_max * 1.12], "y": [spot_lbl], "label": [f"{spot:.2f}"]})
+    spot_label_mult = 1.22 if is_mobile else 1.12
+    spot_label_df = pd.DataFrame({
+        "x": [-abs_max * spot_label_mult], 
+        "y": [spot_lbl], 
+        "label": [f"{spot:.2f}"]
+        })
     spot_label = alt.Chart(spot_label_df).mark_text(
         align="right",
         baseline="middle",
