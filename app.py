@@ -36,7 +36,7 @@ st.title("Gamma Exposure (GEX)")
 # =========================
 DEFAULT_RISK_FREE = 0.05
 DEFAULT_MULTIPLIER = 100
-STRIKES_WINDOW_DEFAULT = 50  # only 30 strikes closest to spot
+STRIKES_WINDOW_DEFAULT = 42  # only 30 strikes closest to spot
 
 # Chart sizing + styling
 CHART_BG = "#2b2b2b"         # dark gray background
@@ -700,6 +700,7 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
 
 
