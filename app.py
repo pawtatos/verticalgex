@@ -1,5 +1,4 @@
 import streamlit as st
-import requests_cache
 import pandas as pd
 import numpy as np
 from math import log, sqrt
@@ -48,21 +47,6 @@ TITLE_TEXT = "#e6e6e6"
 # More background space so labels fit nicely
 CHART_PADDING = {"left": 20, "right": 30, "top": 20, "bottom": 20}
 
-
-#==========================
-# Cache: Session
-#==========================
-@st.cache_resource
-def yf_cached_session():
-    s = requests_cache.CachedSession(
-        cache_name="yfinance_http_cache",
-        backend="sqlite",
-        expire_after=60,  # seconds; tune as needed
-    )
-    s.headers["User-Agent"] = "streamlit-gex/1.0"
-    return s
-
-
 # =========================
 # Cache: options chain
 # =========================
@@ -82,7 +66,7 @@ def fetch_spot_yahoo(symbol: str) -> float:
     if not YF_OK:
         raise RuntimeError("yfinance not installed")
 
-    t = yf.Ticker(symbol, session=yf_cached_session())
+    t = yf.Ticker(symbol)
 
     # fast_info
     try:
@@ -724,6 +708,7 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
 
 
