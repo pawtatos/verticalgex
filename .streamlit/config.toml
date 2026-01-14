@@ -9,4 +9,4 @@ textColor = "#E6E6E6"
 font = "sans serif"
 
 [server]
-fileWatcherType = "none"
+fileWatcherType = "poll"
