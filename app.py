@@ -67,6 +67,28 @@ def fetch_chain(symbol: str) -> pd.DataFrame:
     df.columns = [c.lower().strip().replace(" ", "_") for c in df.columns]
     return df
 
+# =========================
+# GS Ratio 
+# =========================
+@st.cache_data(ttl=30)
+def fetch_ratio_snapshot(sym_num: str, sym_den: str) -> dict:
+    a = fetch_change_snapshot(sym_num)
+    b = fetch_change_snapshot(sym_den)
+
+    if not np.isfinite(a["last"]) or not np.isfinite(b["last"]) or b["last"] == 0:
+        return {"last": np.nan, "chg": np.nan, "chg_pct": np.nan}
+
+    last = a["last"] / b["last"]
+
+    if np.isfinite(a["prev_close"]) and np.isfinite(b["prev_close"]) and b["prev_close"] != 0:
+        prev = a["prev_close"] / b["prev_close"]
+        chg = last - prev
+        chg_pct = chg / prev
+    else:
+        chg = np.nan
+        chg_pct = np.nan
+
+    return {"last": last, "chg": chg, "chg_pct": chg_pct}
 
 # =========================
 # Yahoo spot + monitor snapshots
@@ -252,7 +274,7 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
         ">
           <div style="min-width:0;">
             <div style="
-              font-size:14px;
+              font-size:16px;
               font-weight:800;
               line-height:1.10;
               color:#e6e6e6;
@@ -291,7 +313,7 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
             ">{last}</div>
 
             <div style="
-              font-size:10px;
+              font-size:12px;
               font-weight:800;
               display:flex;
               gap:6px;
@@ -810,16 +832,40 @@ with left:
     ])
 
     # Futures (under Snapshot)
-    FUTURES = {
+    rows = []
+
+    BASE_FUTURES = {
         "S&P 500": "ES=F",
         "Nasdaq 100": "NQ=F",
         "Dow": "YM=F",
         "Gold": "GC=F",
         "Silver": "SI=F",
-        "Crude Oil": "CL=F",
-    }
-    fut_df = build_monitor_table(FUTURES)
+}
+
+    # Normal futures
+    for label, sym in BASE_FUTURES.items():
+        snap = fetch_change_snapshot(sym)
+        rows.append({
+            "Label": label,
+            "Symbol": sym,
+            "Last": snap["last"],
+            "Chg": snap["chg"],
+            "Chg%": snap["chg_pct"],
+        })
+
+    # GS Ratio = Gold / Silver
+    gs = fetch_ratio_snapshot("GC=F", "SI=F")
+    rows.append({
+        "Label": "GS Ratio",
+        "Symbol": "GC / SI",
+        "Last": gs["last"],
+        "Chg": gs["chg"],
+        "Chg%": gs["chg_pct"],
+    })
+
+    fut_df = pd.DataFrame(rows)
     render_mini_cards("Futures", fut_df, cols_desktop=3)
+
 
     # Watchlist
     WATCHLIST = {
@@ -842,5 +888,3 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
-
-
