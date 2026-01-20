@@ -530,7 +530,7 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
             "strike_lbl:N",
             sort=alt.SortField(field="strike", order="descending"),
             axis=y_axis,
-            scale=alt.Scale(paddingInner=0.55, paddingOuter=0.30, reverse=True),
+            scale=alt.Scale(paddingInner=0.55, paddingOuter=0.30),
         ),
         color=alt.Color(
             "bar_color:N",
@@ -829,3 +829,4 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
