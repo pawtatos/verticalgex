@@ -14,9 +14,6 @@ try:
 except Exception:
     AUTOREFRESH_OK = False
 
-screen_w = st_javascript("window.innerWidth")
-is_mobile = False if screen_w is None else screen_w <= 768
-
 # Optional (auto spot pull)
 try:
     import yfinance as yf
@@ -33,10 +30,14 @@ except Exception:
 
 
 # =========================
-# App config
+# Screen / layout
 # =========================
+screen_w = st_javascript("window.innerWidth")
+is_mobile = False if screen_w is None else screen_w <= 768
+
 st.set_page_config(page_title="Gamma Exposure (GEX)", layout="wide")
 st.title("Gamma Exposure (GEX)")
+
 
 # =========================
 # Defaults / styling
@@ -52,15 +53,12 @@ TITLE_TEXT = "#e6e6e6"
 CHART_PADDING = {"left": 20, "right": 30, "top": 20, "bottom": 20}
 
 MONITOR_REFRESH_SECONDS = 30
-
-# Auto-refresh (monitors)
-# Streamlit re-runs the script, but caching keeps heavy work stable.
 if AUTOREFRESH_OK:
     st_autorefresh(interval=MONITOR_REFRESH_SECONDS * 1000, key="monitor_autorefresh")
 
 
 # =========================
-# Caches
+# Cache: options chain
 # =========================
 @st.cache_data(ttl=300)
 def fetch_chain(symbol: str) -> pd.DataFrame:
@@ -70,11 +68,13 @@ def fetch_chain(symbol: str) -> pd.DataFrame:
     return df
 
 
+# =========================
+# Yahoo spot + monitor snapshots
+# =========================
 @st.cache_data(ttl=30)
 def fetch_spot_yahoo(symbol: str) -> float:
     if not YF_OK:
         raise RuntimeError("yfinance not installed")
-
     t = yf.Ticker(symbol)
 
     # fast_info
@@ -121,14 +121,8 @@ def fetch_change_snapshot(symbol: str) -> dict:
     try:
         fi = getattr(t, "fast_info", None)
         if fi:
-            if fi.get("last_price") is not None:
-                last = float(fi.get("last_price"))
-            elif fi.get("lastPrice") is not None:
-                last = float(fi.get("lastPrice"))
-            if fi.get("previous_close") is not None:
-                prev_close = float(fi.get("previous_close"))
-            elif fi.get("previousClose") is not None:
-                prev_close = float(fi.get("previousClose"))
+            last = float(fi.get("last_price") or fi.get("lastPrice") or np.nan)
+            prev_close = float(fi.get("previous_close") or fi.get("previousClose") or np.nan)
     except Exception:
         pass
 
@@ -138,12 +132,12 @@ def fetch_change_snapshot(symbol: str) -> dict:
             closes = hist["Close"].dropna().astype(float)
             if len(closes) >= 2:
                 prev_close = float(closes.iloc[-2])
-            if last is None and len(closes) >= 1:
+            if last is None or not np.isfinite(last):
                 last = float(closes.iloc[-1])
     except Exception:
         pass
 
-    if last is None:
+    if last is None or not np.isfinite(last):
         last = float(fetch_spot_yahoo(symbol))
     if prev_close is None or (isinstance(prev_close, float) and (not np.isfinite(prev_close) or prev_close == 0)):
         prev_close = np.nan
@@ -159,14 +153,14 @@ def build_monitor_table(items) -> pd.DataFrame:
     items can be:
       - list[str] of symbols, OR
       - dict[str, str] mapping display_label -> yahoo_symbol
-    Returns columns: Label, Symbol, Last, Chg, Chg%
+    Returns: Label, Symbol, Last, Chg, Chg%
     """
     rows = []
 
     if isinstance(items, dict):
-        pairs = list(items.items())  # (label, symbol)
+        pairs = list(items.items())
     else:
-        pairs = [(s, s) for s in items]  # label == symbol
+        pairs = [(s, s) for s in items]
 
     for label, sym in pairs:
         sym = str(sym).strip()
@@ -213,7 +207,7 @@ def dir_color(val) -> str:
 
 
 # =========================
-# Square tiles renderer (Futures + Watchlist)
+# Compact square tiles (Futures + Watchlist)
 # =========================
 def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
     st.markdown(f"### {title}")
@@ -222,13 +216,13 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
         return
 
     cols = 2 if is_mobile else cols_desktop
-    tile_h = 45 if is_mobile else 45  # tighter height
+    tile_h = 45 if is_mobile else 45
 
     tiles_html = f"""
     <div style="
       display:grid;
       grid-template-columns: repeat({cols}, minmax(0, 1fr));
-      gap:6px;                 /* tighter grid gap */
+      gap:6px;
       margin-top:4px;
       margin-bottom:10px;
     ">
@@ -247,7 +241,7 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
         tiles_html += f"""
         <div style="
           height:{tile_h}px;
-          padding: 1px 10px;      /* tighter padding */
+          padding:1px 10px;
           border-radius:10px;
           background: rgba(255,255,255,0.03);
           border:1px solid rgba(255,255,255,0.06);
@@ -256,11 +250,9 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
           align-items:center;
           min-width:0;
         ">
-
-          <!-- LEFT -->
           <div style="min-width:0;">
             <div style="
-              font-size:14px;    /* smaller */
+              font-size:16px;
               font-weight:800;
               line-height:1.10;
               color:#e6e6e6;
@@ -268,7 +260,7 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
               -webkit-line-clamp:2;
               -webkit-box-orient:vertical;
               overflow:hidden;
-              margin-bottom:0px;  /* remove extra gap */
+              margin-bottom:0px;
             ">{label}</div>
 
             <div style="
@@ -282,17 +274,16 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
             ">{sym}</div>
           </div>
 
-          <!-- RIGHT -->
           <div style="
             text-align:right;
             display:flex;
             flex-direction:column;
             align-items:flex-end;
-            gap:1px;             /* tighter vertical spacing */
-            min-width:80px;      /* narrower */
+            gap:1px;
+            min-width:80px;
           ">
             <div style="
-              font-size:14px;    /* smaller */
+              font-size:14px;
               font-weight:900;
               color:#e6e6e6;
               line-height:1.0;
@@ -311,21 +302,18 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
               <span style="color:{c_pct};">{pct}</span>
             </div>
           </div>
-
         </div>
         """
 
     tiles_html += "</div>"
 
     rows = int(np.ceil(len(df) / cols)) if cols > 0 else len(df)
-    height = rows * tile_h + (rows - 1) * 6 + 16  # match new gap
+    height = rows * tile_h + (rows - 1) * 6 + 16
     components.html(tiles_html, height=height, scrolling=False)
 
 
-
-
 # =========================
-# Gamma math
+# Black–Scholes Gamma
 # =========================
 def bs_gamma(S, K, T, r, sigma):
     if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
@@ -469,7 +457,7 @@ def format_big(n):
 
 
 # =========================
-# Chart
+# Chart (FIXED strike ordering)
 # =========================
 def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
     if gex_all is None or gex_all.empty:
@@ -489,17 +477,29 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
     g["dealer_gex"] = pd.to_numeric(g["dealer_gex"], errors="coerce")
     g = g.dropna(subset=["strike", "dealer_gex"]).copy()
 
+    # keep N strikes closest to spot
     g["dist"] = (g["strike"] - spot).abs()
-    g = g.sort_values("dist").head(int(STRIKES_WINDOW_DEFAULT)).sort_values("strike").reset_index(drop=True)
+    g = g.sort_values("dist").head(int(STRIKES_WINDOW_DEFAULT)).reset_index(drop=True)
 
-    g["strike_lbl"] = g["strike"].map(lambda x: f"{x:.2f}")
+    # shares per $1 move
     denom = max(float(spot) ** 2, 1e-9)
     g["shares_per_1d"] = (g["dealer_gex"] / denom).replace([np.inf, -np.inf], np.nan)
+    g = g.dropna(subset=["shares_per_1d"]).copy()
+
+    # Stable labels + numeric sort key
+    g["strike_sort"] = g["strike"].astype(float)
+    g["strike_str"] = g["strike_sort"].map(lambda v: f"{v:.2f}").astype(str)
+
+    # IMPORTANT: collapse duplicates so each strike is exactly one bar row
+    g = g.groupby(["strike_sort", "strike_str"], as_index=False)["shares_per_1d"].sum()
+
     g["bar_color"] = np.where(g["shares_per_1d"] >= 0, "pos", "neg")
 
     abs_max = float(np.abs(g["shares_per_1d"]).max()) if len(g) else 1.0
     if not np.isfinite(abs_max) or abs_max <= 0:
         abs_max = 1.0
+
+    # Positive on LEFT, negative on RIGHT
     x_domain = [abs_max, -abs_max]
 
     n = len(g)
@@ -514,23 +514,33 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
         ticks=False,
         labelExpr="replace(format(datum.value, '~s'), 'k', 'K')",
     )
-    y_axis = alt.Axis(
-        title="Strike",
-        grid=False,
-        labelColor=AXIS_TEXT,
-        titleColor=AXIS_TEXT,
-        tickColor=GRID_COLOR,
-        domainColor=GRID_COLOR,
-        ticks=False,
+
+    # ========= STRIKE DIRECTION =========
+    # descending = BIG strikes on TOP
+    # ascending  = SMALL strikes on TOP
+    STRIKE_ORDER = "descending"
+
+    strike_domain = (
+        g.sort_values("strike_sort", ascending=(STRIKE_ORDER == "ascending"))["strike_str"]
+        .astype(str)
+        .tolist()
     )
 
     bars = alt.Chart(g).mark_bar(size=bar_size).encode(
         x=alt.X("shares_per_1d:Q", axis=x_axis, scale=alt.Scale(domain=x_domain)),
         y=alt.Y(
-            "strike_lbl:N",
-            sort=alt.SortField(field="strike", order="descending"),
-            axis=y_axis,
-            scale=alt.Scale(paddingInner=0.55, paddingOuter=0.30),
+            "strike_str:N",
+            axis=alt.Axis(
+                title="Strike",
+                grid=False,
+                labelColor=AXIS_TEXT,
+                titleColor=AXIS_TEXT,
+                tickColor=GRID_COLOR,
+                domainColor=GRID_COLOR,
+                ticks=False,
+            ),
+            # ✅ THIS is the bulletproof fix: force category order via scale domain
+            scale=alt.Scale(domain=strike_domain, paddingInner=0.55, paddingOuter=0.30),
         ),
         color=alt.Color(
             "bar_color:N",
@@ -538,30 +548,37 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
             legend=None
         ),
         tooltip=[
-            alt.Tooltip("strike:Q", format=".2f", title="Strike"),
+            alt.Tooltip("strike_sort:Q", format=".2f", title="Strike"),
             alt.Tooltip("shares_per_1d:Q", format=",.0f", title="Shares per $1"),
-            alt.Tooltip("dealer_gex:Q", format=",.0f", title="Dealer GEX (Raw)"),
         ],
     ).properties(height=chart_h)
 
-    zero_line = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(color="#8a8a8a", opacity=0.9, strokeWidth=2).encode(x="x:Q")
+    zero_line = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(
+        color="#8a8a8a", opacity=0.9, strokeWidth=2
+    ).encode(x="x:Q")
 
-    spot_row = g.loc[(g["strike"] - spot).abs().idxmin()]
-    spot_lbl = str(spot_row["strike_lbl"])
-    spot_rule_df = pd.DataFrame({"x1": [abs_max], "x2": [-abs_max], "y": [spot_lbl]})
-    spot_rule = alt.Chart(spot_rule_df).mark_rule(strokeDash=[6, 6], strokeWidth=2, opacity=0.9, color="white").encode(
-        x="x1:Q", x2="x2:Q", y=alt.Y("y:N", sort=alt.SortField(field="y", order="descending"))
+    # Spot line: snap to nearest displayed strike and use strike_str (same category domain)
+    spot_row = g.loc[(g["strike_sort"] - spot).abs().idxmin()]
+    spot_str = str(spot_row["strike_str"])
+
+    spot_rule_df = pd.DataFrame({"x1": [abs_max], "x2": [-abs_max], "strike_str": [spot_str]})
+    spot_rule = alt.Chart(spot_rule_df).mark_rule(
+        strokeDash=[6, 6], strokeWidth=2, opacity=0.9, color="white"
+    ).encode(
+        x="x1:Q",
+        x2="x2:Q",
+        y="strike_str:N",
     )
 
     spot_label_mult = 1.50 if is_mobile else 1.12
-    spot_label_df = pd.DataFrame({"x": [-abs_max * spot_label_mult], "y": [spot_lbl], "label": [f"{spot:.2f}"]})
+    spot_label_df = pd.DataFrame({"x": [-abs_max * spot_label_mult], "strike_str": [spot_str], "label": [f"{spot:.2f}"]})
     spot_label = alt.Chart(spot_label_df).mark_text(
         align="right", baseline="middle", dx=8,
         color="white", fontSize=12, fontWeight="bold"
     ).encode(
         x="x:Q",
-        y=alt.Y("y:N", sort=alt.SortField(field="y", order="descending")),
-        text="label:N"
+        y="strike_str:N",
+        text="label:N",
     )
 
     title_df = pd.DataFrame({"x": [0.0], "t": [chart_title]})
@@ -574,9 +591,13 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
         text="t:N",
     )
 
-    chart = (bars + zero_line + spot_rule + spot_label + title_layer).properties(padding=CHART_PADDING).configure_view(
+    chart = (bars + zero_line + spot_rule + spot_label + title_layer).properties(
+        padding=CHART_PADDING
+    ).configure_view(
         strokeWidth=0, fill=CHART_BG
-    ).configure(background=CHART_BG)
+    ).configure(
+        background=CHART_BG
+    )
 
     st.altair_chart(chart, use_container_width=True)
 
@@ -605,13 +626,11 @@ def set_all(ticker: str, expiries: list[str], value: bool):
 
 
 # =========================
-# SINGLE-ROW LAYOUT (chart top-aligned)
+# Layout
 # =========================
 left, right = st.columns([1, 2], gap="large")
 
 with left:
-
-    # Controls
     ticker = st.text_input("Ticker", "SPY").upper().strip()
     bucket = st.radio("Expiration", ["Nearest expiration date", "All expiries"], horizontal=False)
 
@@ -790,35 +809,29 @@ with left:
         {"label": "ZeroGamma", "value": zg_disp},
     ])
 
-    # Futures (square tiles)
-    if YF_OK:
-        FUTURES = {
-            "S&P 500": "ES=F",
-            "Nasdaq 100": "NQ=F",
-            "Dow": "YM=F",
-            "Gold": "GC=F",
-            "Silver": "SI=F",
-            "Crude Oil": "CL=F",
-        }
-        fut_df = build_monitor_table(FUTURES)
-        render_mini_cards("Futures", fut_df, cols_desktop=3)
-    else:
-        st.info("Futures require yfinance (`pip install yfinance`).")
+    # Futures (under Snapshot)
+    FUTURES = {
+        "S&P 500": "ES=F",
+        "Nasdaq 100": "NQ=F",
+        "Dow": "YM=F",
+        "Gold": "GC=F",
+        "Silver": "SI=F",
+        "Crude Oil": "CL=F",
+    }
+    fut_df = build_monitor_table(FUTURES)
+    render_mini_cards("Futures", fut_df, cols_desktop=3)
 
-    # Watchlist (square tiles)
-    if YF_OK:
-        WATCHLIST = {
-            "S&P500": "SPY",
-            "Nasdaq": "QQQ",
-            "QQQ 3X Long": "TQQQ",
-            "HOOD 2X Long": "ROBN",
-            "SOFI 2X Long": "SOFX",
-            "NVIDIA Corp": "NVDA",
-        }
-        wdf = build_monitor_table(WATCHLIST)
-        render_mini_cards("Watchlist", wdf, cols_desktop=3)
-    else:
-        st.info("Watchlist requires yfinance (`pip install yfinance`).")
+    # Watchlist
+    WATCHLIST = {
+        "S&P 500": "SPY",
+        "Nasdaq": "QQQ",
+        "QQQ 3x Long": "TQQQ",
+        "Hood 2x Long": "ROBN",
+        "Sofi 2x Long ": "SOFX",
+        "NVIDIA Corp": "NVDA",
+    }
+    wdf = build_monitor_table(WATCHLIST)
+    render_mini_cards("Watchlist", wdf, cols_desktop=3)
 
 
 with right:
@@ -829,4 +842,3 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
-
