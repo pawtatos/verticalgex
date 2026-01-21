@@ -283,7 +283,7 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
         ">
           <div style="min-width:0;">
             <div style="
-              font-size:16px;
+              font-size:14px;
               font-weight:800;
               line-height:1.10;
               color:#e6e6e6;
@@ -903,9 +903,9 @@ with left:
     WATCHLIST = {
         "S&P 500": "SPY",
         "Nasdaq": "QQQ",
-        "QQQ 3x Long": "TQQQ",
-        "Hood 2x Long": "ROBN",
-        "Sofi 2x Long ": "SOFX",
+        "QQQ 3x": "TQQQ",
+        "Hood 2x": "ROBN",
+        "Sofi 2x": "SOFX",
         "NVIDIA Corp": "NVDA",
     }
     wdf = build_monitor_table(WATCHLIST)
@@ -920,3 +920,4 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
