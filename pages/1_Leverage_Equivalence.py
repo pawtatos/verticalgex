@@ -2,125 +2,48 @@ import streamlit as st
 import yfinance as yf
 import textwrap
 
-st.set_page_config(page_title="Leverage Equivalence", layout="centered")
-
 def top_nav(active: str = "lev"):
     st.markdown(
         """
         <style>
-          [data-testid="stSidebarNav"] { display: none; }
-          .navwrap { padding: 6px 0 10px 0; }
-          .navwrap div[data-testid="stHorizontalBlock"] { gap: 0.5rem; }
-          .navbtn button {
-            border-radius: 12px !important;
-            font-weight: 850 !important;
-            height: 42px !important;
+          /* hide entire sidebar (incl arrows) */
+          section[data-testid="stSidebar"] { display: none; }
+          div[data-testid="stAppViewContainer"] { margin-left: 0; }
+
+          /* small pill links */
+          .pill a {
+            display:inline-block;
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.18);
+            background: rgba(255,255,255,0.03);
+            text-decoration: none !important;
+            font-size: 0.78rem;
+            font-weight: 650;
+            color: rgba(255,255,255,0.92) !important;
           }
-          .navbtn.active button {
-            border: 2px solid rgba(80,170,255,0.95) !important;
-            background: rgba(80,170,255,0.20) !important;
-            box-shadow: inset 0 -4px 0 rgba(80,170,255,0.95) !important;
+          .pill.active a {
+            border: 1.5px solid rgba(80,170,255,0.95);
+            background: rgba(80,170,255,0.18);
+            box-shadow: inset 0 -2px 0 rgba(80,170,255,0.95);
           }
         </style>
         """,
         unsafe_allow_html=True
     )
 
-    c1, c2 = st.columns([1, 1], gap="small")
+    c1, c2, _ = st.columns([0.12, 0.26, 1], gap="small")
 
     with c1:
-        st.markdown('<div class="navbtn {}">'.format("active" if active=="gex" else ""), unsafe_allow_html=True)
-        if st.button("GEX", use_container_width=True):
-            st.switch_page("app.py")
+        st.markdown(f'<div class="pill {"active" if active=="gex" else ""}">', unsafe_allow_html=True)
+        st.page_link("app.py", label="GEX")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c2:
-        st.markdown('<div class="navbtn {}">'.format("active" if active=="lev" else ""), unsafe_allow_html=True)
-        if st.button("Leverage Equivalence", use_container_width=True):
-            st.switch_page("Leverage_Equivalence")
+        st.markdown(f'<div class="pill {"active" if active=="lev" else ""}">', unsafe_allow_html=True)
+        st.page_link("pages/1_Leverage_Equivalence.py", label="Leverage Equivalence")
         st.markdown("</div>", unsafe_allow_html=True)
 
-top_nav(active="lev")
-
-# ======================
-# CSS
-# ======================
-st.markdown(
-    """
-    <style>
-      div[data-baseweb="input"] input {
-        padding-top: 6px !important;
-        padding-bottom: 6px !important;
-        font-size: 14px !important;
-      }
-
-      .mult-tabs { margin-top: 26px; }
-      .mult-tabs div[data-testid="stSegmentedControl"] button {
-        height: 56px !important;
-        border-radius: 14px !important;
-        font-weight: 900 !important;
-        letter-spacing: 0.9px !important;
-        border: 1px solid rgba(255,255,255,0.18) !important;
-        background: rgba(255,255,255,0.03) !important;
-      }
-      .mult-tabs div[data-testid="stSegmentedControl"] button[aria-pressed="true"] {
-        border: 2px solid rgba(80,170,255,0.95) !important;
-        background: rgba(80,170,255,0.20) !important;
-        box-shadow: inset 0 -4px 0 rgba(80,170,255,0.95) !important;
-      }
-
-      .panel {
-        border: 1px solid rgba(255,255,255,0.12);
-        border-radius: 16px;
-        padding: 12px;
-        background: rgba(255,255,255,0.03);
-      }
-      .grid {
-        display: grid;
-        grid-template-columns: 0.95fr 1.25fr;
-        gap: 12px;
-        align-items: start;
-      }
-      .price-stack { display: grid; gap: 10px; }
-      .card {
-        border: 1px solid rgba(255,255,255,0.10);
-        border-radius: 12px;
-        padding: 12px 10px;
-        background: rgba(255,255,255,0.02);
-        text-align: center;
-      }
-      .tkr { font-size: 0.82rem; opacity: 0.80; font-weight: 800; letter-spacing: 0.4px; }
-      .px  { font-size: 1.05rem; font-weight: 900; margin-top: 4px; }
-
-      .muted { opacity: 0.75; font-size: 0.90rem; }
-      .mono { font-variant-numeric: tabular-nums; }
-      .out-title { font-size: 0.82rem; opacity: 0.80; font-weight: 800; }
-      .out-eq    { font-size: 1.12rem; font-weight: 950; margin-top: 2px; }
-      .divider   { height: 1px; background: rgba(255,255,255,0.10); margin: 10px 0; }
-      .out-sub   { font-size: 0.90rem; opacity: 0.85; margin-top: 6px; }
-      .out-num   { font-size: 0.98rem; font-weight: 900; margin-top: 2px; }
-
-      .btnrow div[data-testid="stButton"] > button {
-        height: 44px !important;
-        border-radius: 14px !important;
-        font-weight: 850 !important;
-      }
-
-      .disclaimer {
-        margin-top: 10px;
-        margin-bottom: 14px;
-        padding: 10px 12px 18px 12px;
-        border-radius: 12px;
-        border: 1px solid rgba(255,255,255,0.10);
-        background: rgba(255,255,255,0.02);
-        font-size: 0.82rem;
-        opacity: 0.78;
-        line-height: 1.25rem;
-      }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 # ======================
 # Helpers
