@@ -45,7 +45,7 @@ def top_nav(active: str = "gex"):
             f'<div class="navbtn {"active" if active=="gex" else ""}">',
             unsafe_allow_html=True
         )
-        if st.button("GEX", key=f"nav_gex"):
+        if st.button("GEX", key=f"nav_gex_{active}"):
             st.switch_page("app.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -54,8 +54,8 @@ def top_nav(active: str = "gex"):
             f'<div class="navbtn {"active" if active=="lev" else ""}">',
             unsafe_allow_html=True
         )
-        if st.button("Leverage Equivalence", key=f"nav_lev"):
-            st.switch_page("pages/1_Leverage_Equivalence.py")
+        if st.button("Leverage Equivalence", key=f"nav_lev_{actiive}"):
+            st.switch_page("Leverage_Equivalence")
         st.markdown("</div>", unsafe_allow_html=True)
 
 # Optional auto-refresh
@@ -971,4 +971,5 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
