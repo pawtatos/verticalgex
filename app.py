@@ -38,7 +38,7 @@ def top_nav(active: str = "gex"):
         unsafe_allow_html=True
     )
 
-    c1, c2, _ = st.columns([0.05, 0.6, 1])
+    c1, c2, _ = st.columns([0.06, 0.6, 1])
 
     with c1:
         st.markdown(
@@ -971,3 +971,4 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
