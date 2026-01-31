@@ -7,8 +7,6 @@ from scipy.stats import norm
 from options.data import get_options_view_df
 from streamlit_javascript import st_javascript
 
-st.set_page_config(page_title="GEX", layout="wide")
-
 def top_nav(active: str = "gex"):
     st.markdown(
         """
@@ -971,3 +969,4 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
