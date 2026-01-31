@@ -11,9 +11,11 @@ def top_nav(active: str = "gex"):
     st.markdown(
         """
         <style>
+          /* remove sidebar + arrows */
           section[data-testid="stSidebar"] { display: none; }
           div[data-testid="stAppViewContainer"] { margin-left: 0; }
 
+          /* compact pill buttons */
           .navbtn div[data-testid="stButton"] > button {
             height: 28px !important;
             padding: 0 10px !important;
@@ -32,11 +34,11 @@ def top_nav(active: str = "gex"):
         unsafe_allow_html=True
     )
 
-    # --- click handlers set intent only ---
+    # Set navigation intent (do NOT switch pages inside button blocks)
     def go(path: str):
-        st.session_state["_go"] = path
+        st.session_state["_go_page"] = path
 
-    c1, c2, _ = st.columns([0.06, 0.06, 1])
+    c1, c2, _ = st.columns([0.12, 0.26, 1])
 
     with c1:
         st.markdown(f'<div class="navbtn {"active" if active=="gex" else ""}">', unsafe_allow_html=True)
@@ -53,11 +55,10 @@ def top_nav(active: str = "gex"):
         )
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- perform the switch once, after widgets exist ---
-    if st.session_state.get("_go"):
-        path = st.session_state.pop("_go")
-        st.switch_page(path)
-
+    # Perform switch once, after rendering
+    dest = st.session_state.pop("_go_page", None)
+    if dest:
+        st.switch_page(dest)
 
 # Optional auto-refresh
 try:
@@ -972,6 +973,7 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
 
 
