@@ -37,7 +37,7 @@ def top_nav(active: str = "lev"):
     with c2:
         st.markdown('<div class="navbtn {}">'.format("active" if active=="lev" else ""), unsafe_allow_html=True)
         if st.button("Leverage Equivalence", use_container_width=True):
-            st.switch_page("pages/1_Leverage_Equivalence.py")
+            st.switch_page("Leverage_Equivalence")
         st.markdown("</div>", unsafe_allow_html=True)
 
 top_nav(active="lev")
