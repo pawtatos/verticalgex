@@ -2,7 +2,24 @@ import streamlit as st
 import yfinance as yf
 import textwrap
 
-st.set_page_config(page_title="Leverage Equivalence", layout="centered")
+st.set_page_config(
+    page_title="Leverage Equivalence",
+    layout="centered",
+    initial_sidebar_state="collapsed",
+)
+
+st.markdown("""
+<style>
+  /* Hide the entire sidebar (container) */
+  [data-testid="stSidebar"] { display: none; }
+
+  /* Hide the multipage nav just in case */
+  [data-testid="stSidebarNav"] { display: none; }
+
+  /* Hide the little “>” / collapse control */
+  [data-testid="collapsedControl"] { display: none; }
+</style>
+""", unsafe_allow_html=True)
 
 def top_nav(active: str = "lev"):
     st.markdown(
