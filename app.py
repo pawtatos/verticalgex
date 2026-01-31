@@ -7,47 +7,55 @@ from scipy.stats import norm
 from options.data import get_options_view_df
 from streamlit_javascript import st_javascript
 
+st.set_page_config(page_title="GEX", layout="wide")
+
 def top_nav(active: str = "gex"):
     st.markdown(
         """
         <style>
-          /* hide entire sidebar (incl arrows) */
+          /* ---- REMOVE SIDEBAR COMPLETELY ---- */
           section[data-testid="stSidebar"] { display: none; }
           div[data-testid="stAppViewContainer"] { margin-left: 0; }
 
-          /* small pill links (page_link renders an <a>) */
-          .pill a {
-            display:inline-block;
-            padding: 6px 12px;
-            border-radius: 999px;
-            border: 1px solid rgba(255,255,255,0.18);
-            background: rgba(255,255,255,0.03);
-            text-decoration: none !important;
-            font-size: 0.78rem;
-            font-weight: 650;
-            color: rgba(255,255,255,0.92) !important;
-            line-height: 1;
+          /* ---- SMALL NAV BUTTONS ---- */
+          .navbtn div[data-testid="stButton"] > button {
+            height: 28px !important;
+            padding: 0 10px !important;
+            font-size: 0.78rem !important;
+            font-weight: 650 !important;
+            border-radius: 999px !important; /* pill */
+            min-width: unset !important;
+            width: auto !important;
           }
-          .pill.active a {
-            border: 1.5px solid rgba(80,170,255,0.95);
-            background: rgba(80,170,255,0.18);
-            box-shadow: inset 0 -2px 0 rgba(80,170,255,0.95);
+
+          .navbtn.active div[data-testid="stButton"] > button {
+            border: 1.5px solid rgba(80,170,255,0.95) !important;
+            background: rgba(80,170,255,0.18) !important;
+            box-shadow: inset 0 -2px 0 rgba(80,170,255,0.95) !important;
           }
         </style>
         """,
         unsafe_allow_html=True
     )
 
-    c1, c2, _ = st.columns([0.12, 0.26, 1], gap="small")
+    c1, c2, _ = st.columns([0.05, 0.6, 1])
 
     with c1:
-        st.markdown(f'<div class="pill {"active" if active=="gex" else ""}">', unsafe_allow_html=True)
-        st.page_link("app.py", label="GEX")
+        st.markdown(
+            f'<div class="navbtn {"active" if active=="gex" else ""}">',
+            unsafe_allow_html=True
+        )
+        if st.button("GEX", key=f"nav_gex"):
+            st.switch_page("app.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c2:
-        st.markdown(f'<div class="pill {"active" if active=="lev" else ""}">', unsafe_allow_html=True)
-        st.page_link("pages/1_Leverage_Equivalence.py", label="Leverage Equivalence")
+        st.markdown(
+            f'<div class="navbtn {"active" if active=="lev" else ""}">',
+            unsafe_allow_html=True
+        )
+        if st.button("Leverage Equivalence", key=f"nav_lev"):
+            st.switch_page("pages/1_Leverage_Equivalence.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
 # Optional auto-refresh
@@ -963,9 +971,3 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
-
-
-
-
-
-
