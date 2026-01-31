@@ -11,54 +11,44 @@ def top_nav(active: str = "gex"):
     st.markdown(
         """
         <style>
-          /* remove sidebar + arrows */
+          /* hide entire sidebar (incl arrows) */
           section[data-testid="stSidebar"] { display: none; }
           div[data-testid="stAppViewContainer"] { margin-left: 0; }
 
-          /* compact pill buttons */
-          .navbtn div[data-testid="stButton"] > button {
-            height: 28px !important;
-            padding: 0 10px !important;
-            font-size: 0.78rem !important;
-            font-weight: 650 !important;
-            border-radius: 999px !important;
-            width: auto !important;
+          /* small pill links (page_link renders an <a>) */
+          .pill a {
+            display:inline-block;
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.18);
+            background: rgba(255,255,255,0.03);
+            text-decoration: none !important;
+            font-size: 0.78rem;
+            font-weight: 650;
+            color: rgba(255,255,255,0.92) !important;
+            line-height: 1;
           }
-          .navbtn.active div[data-testid="stButton"] > button {
-            border: 1.5px solid rgba(80,170,255,0.95) !important;
-            background: rgba(80,170,255,0.18) !important;
-            box-shadow: inset 0 -2px 0 rgba(80,170,255,0.95) !important;
+          .pill.active a {
+            border: 1.5px solid rgba(80,170,255,0.95);
+            background: rgba(80,170,255,0.18);
+            box-shadow: inset 0 -2px 0 rgba(80,170,255,0.95);
           }
         </style>
         """,
         unsafe_allow_html=True
     )
 
-    # Set navigation intent (do NOT switch pages inside button blocks)
-    def go(path: str):
-        st.session_state["_go_page"] = path
-
-    c1, c2, _ = st.columns([0.12, 0.26, 1])
+    c1, c2, _ = st.columns([0.12, 0.26, 1], gap="small")
 
     with c1:
-        st.markdown(f'<div class="navbtn {"active" if active=="gex" else ""}">', unsafe_allow_html=True)
-        st.button("GEX", key=f"nav_gex_{active}", on_click=go, args=("app.py",))
+        st.markdown(f'<div class="pill {"active" if active=="gex" else ""}">', unsafe_allow_html=True)
+        st.page_link("app.py", label="GEX")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c2:
-        st.markdown(f'<div class="navbtn {"active" if active=="lev" else ""}">', unsafe_allow_html=True)
-        st.button(
-            "Leverage Equivalence",
-            key=f"nav_lev_{active}",
-            on_click=go,
-            args=("pages/1_Leverage_Equivalence.py",),
-        )
+        st.markdown(f'<div class="pill {"active" if active=="lev" else ""}">', unsafe_allow_html=True)
+        st.page_link("pages/1_Leverage_Equivalence.py", label="Leverage Equivalence")
         st.markdown("</div>", unsafe_allow_html=True)
-
-    # Perform switch once, after rendering
-    dest = st.session_state.pop("_go_page", None)
-    if dest:
-        st.switch_page(dest)
 
 # Optional auto-refresh
 try:
@@ -973,6 +963,7 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
 
 
