@@ -7,27 +7,21 @@ from scipy.stats import norm
 from options.data import get_options_view_df
 from streamlit_javascript import st_javascript
 
-st.set_page_config(page_title="GEX", layout="wide")
-
 def top_nav(active: str = "gex"):
     st.markdown(
         """
         <style>
-          /* ---- REMOVE SIDEBAR COMPLETELY ---- */
           section[data-testid="stSidebar"] { display: none; }
           div[data-testid="stAppViewContainer"] { margin-left: 0; }
 
-          /* ---- SMALL NAV BUTTONS ---- */
           .navbtn div[data-testid="stButton"] > button {
             height: 28px !important;
             padding: 0 10px !important;
             font-size: 0.78rem !important;
             font-weight: 650 !important;
-            border-radius: 999px !important; /* pill */
-            min-width: unset !important;
+            border-radius: 999px !important;
             width: auto !important;
           }
-
           .navbtn.active div[data-testid="stButton"] > button {
             border: 1.5px solid rgba(80,170,255,0.95) !important;
             background: rgba(80,170,255,0.18) !important;
@@ -38,25 +32,32 @@ def top_nav(active: str = "gex"):
         unsafe_allow_html=True
     )
 
-    c1, c2, _ = st.columns([0.06, 0.6, 1])
+    # --- click handlers set intent only ---
+    def go(path: str):
+        st.session_state["_go"] = path
+
+    c1, c2, _ = st.columns([0.06, 0.06, 1])
 
     with c1:
-        st.markdown(
-            f'<div class="navbtn {"active" if active=="gex" else ""}">',
-            unsafe_allow_html=True
-        )
-        if st.button("GEX", key=f"nav_gex_{active}"):
-            st.switch_page("app.py")
+        st.markdown(f'<div class="navbtn {"active" if active=="gex" else ""}">', unsafe_allow_html=True)
+        st.button("GEX", key=f"nav_gex_{active}", on_click=go, args=("app.py",))
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c2:
-        st.markdown(
-            f'<div class="navbtn {"active" if active=="lev" else ""}">',
-            unsafe_allow_html=True
+        st.markdown(f'<div class="navbtn {"active" if active=="lev" else ""}">', unsafe_allow_html=True)
+        st.button(
+            "Leverage Equivalence",
+            key=f"nav_lev_{active}",
+            on_click=go,
+            args=("pages/1_Leverage_Equivalence.py",),
         )
-        if st.button("Leverage Equivalence", key=f"nav_lev_{active}"):
-            st.switch_page("Leverage_Equivalence")
         st.markdown("</div>", unsafe_allow_html=True)
+
+    # --- perform the switch once, after widgets exist ---
+    if st.session_state.get("_go"):
+        path = st.session_state.pop("_go")
+        st.switch_page(path)
+
 
 # Optional auto-refresh
 try:
@@ -971,6 +972,7 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
 
 
