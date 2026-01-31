@@ -54,7 +54,7 @@ def top_nav(active: str = "gex"):
             f'<div class="navbtn {"active" if active=="lev" else ""}">',
             unsafe_allow_html=True
         )
-        if st.button("Leverage Equivalence", key=f"nav_lev_{actiive}"):
+        if st.button("Leverage Equivalence", key=f"nav_lev_{active}"):
             st.switch_page("Leverage_Equivalence")
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -971,5 +971,6 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
 
