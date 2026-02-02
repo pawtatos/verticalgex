@@ -1,4 +1,4 @@
-tif# app.py — CC/CSP Recommender (GEX-style tiles, refined layout + alignment fix)
+# app.py — CC/CSP Recommender (GEX-style tiles, refined layout + alignment fix)
 # Includes:
 # - Ticker input + Spot tile aligned on the same baseline (caption spacer fix)
 # - Strategy + Risk under ticker, above expiration
@@ -554,6 +554,7 @@ st.caption(
     "Keep Probability/Keep % is a quick approximation using delta (calls: 1−Δ, puts: 1−|Δ|). "
     "Deltas are estimated via Black–Scholes using Yahoo IV."
 )
+
 
 
 
