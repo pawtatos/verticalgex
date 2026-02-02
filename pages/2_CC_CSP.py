@@ -73,8 +73,8 @@ def top_nav(active: str = "cc"):
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-st.title("Covered Call / CSP Identifier")  # title first (so nav shows under)
 top_nav(active="cc")                      # nav under title
+st.title("Covered Call / CSP Identifier")  # title first (so nav shows under)
 
 if not YF_OK:
     st.error("Missing dependency: yfinance. Install with: pip install yfinance")
@@ -533,6 +533,7 @@ st.caption(
     "Keep Probability/Keep % is a quick approximation using delta (calls: 1−Δ, puts: 1−|Δ|). "
     "Deltas are estimated via Black–Scholes using Yahoo IV."
 )
+
 
 
 
