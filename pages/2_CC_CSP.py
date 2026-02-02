@@ -21,6 +21,10 @@ try:
 except Exception:
     YF_OK = False
 
+
+# =========================
+# Page config + CSS
+# =========================
 st.set_page_config(page_title="CC / CSP Identifier", layout="wide")
 
 def top_nav(active: str = "cc"):
@@ -29,6 +33,7 @@ def top_nav(active: str = "cc"):
         <style>
           section[data-testid="stSidebar"] { display: none; }
           div[data-testid="stAppViewContainer"] { margin-left: 0; }
+
           .navbtn div[data-testid="stButton"] > button {
             height: 28px !important;
             padding: 0 10px !important;
@@ -43,6 +48,27 @@ def top_nav(active: str = "cc"):
             background: rgba(80,170,255,0.18) !important;
             box-shadow: inset 0 -2px 0 rgba(80,170,255,0.95) !important;
           }
+
+          /* Narrow the whole app content so it doesn't span full screen */
+          .block-container{
+            max-width: 980px;
+            padding-top: 1.0rem;
+          }
+
+          /* Compact ticker input */
+          div[data-testid="stTextInput"] input {
+            width: 145px !important;
+            min-width: 145px !important;
+            max-width: 145px !important;
+            text-align: left;
+            font-weight: 700;
+          }
+
+          /* Slightly tighter dataframe header */
+          div[data-testid="stDataFrame"] thead tr th { font-weight: 800 !important; }
+
+          /* Make radios a bit tighter */
+          div[role="radiogroup"] label { margin-right: 14px; }
         </style>
         """,
         unsafe_allow_html=True
@@ -68,50 +94,13 @@ def top_nav(active: str = "cc"):
             st.switch_page("pages/2_CC_CSP.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
-top_nav(active="cc")
 
-# ... then keep the rest of your CC/CSP code unchanged ...
-
-
-# =========================
-# Page config + CSS
-# =========================
-st.set_page_config(page_title="CC / CSP", layout="wide")
-
-st.markdown(
-    """
-    <style>
-      /* Narrow the whole app content so it doesn't span full screen */
-      .block-container{
-        max-width: 980px;
-        padding-top: 1.0rem;
-      }
-
-      /* Compact ticker input */
-      div[data-testid="stTextInput"] input {
-        width: 145px !important;
-        min-width: 145px !important;
-        max-width: 145px !important;
-        text-align: left;
-        font-weight: 700;
-      }
-
-      /* Slightly tighter dataframe header */
-      div[data-testid="stDataFrame"] thead tr th { font-weight: 800 !important; }
-
-      /* Make radios a bit tighter */
-      div[role="radiogroup"] label { margin-right: 14px; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-st.title("Covered Call / CSP Identifier")
+st.title("Covered Call / CSP Identifier")  # title first (so nav shows under)
+top_nav(active="cc")                      # nav under title
 
 if not YF_OK:
     st.error("Missing dependency: yfinance. Install with: pip install yfinance")
     st.stop()
-
 
 # =========================
 # GEX-style tile system
@@ -565,6 +554,7 @@ st.caption(
     "Keep Probability/Keep % is a quick approximation using delta (calls: 1−Δ, puts: 1−|Δ|). "
     "Deltas are estimated via Black–Scholes using Yahoo IV."
 )
+
 
 
 
