@@ -22,8 +22,6 @@ except Exception:
     YF_OK = False
 
 st.set_page_config(page_title="CC / CSP Recommender", layout="wide")
-top_nav(active="cc")
-st.title("Covered Call / CSP Identifier")
 
 def top_nav(active: str = "cc"):
     st.markdown(
@@ -77,6 +75,7 @@ def top_nav(active: str = "cc"):
 # Page config + CSS
 # =========================
 st.set_page_config(page_title="CC / CSP", layout="wide")
+top_nav(active="cc")
 
 st.markdown(
     """
@@ -565,6 +564,7 @@ st.caption(
     "Keep Probability/Keep % is a quick approximation using delta (calls: 1−Δ, puts: 1−|Δ|). "
     "Deltas are estimated via Black–Scholes using Yahoo IV."
 )
+
 
 
 
