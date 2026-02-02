@@ -11,17 +11,15 @@ def top_nav(active: str = "gex"):
     st.markdown(
         """
         <style>
-          /* ---- REMOVE SIDEBAR COMPLETELY ---- */
           section[data-testid="stSidebar"] { display: none; }
           div[data-testid="stAppViewContainer"] { margin-left: 0; }
 
-          /* ---- SMALL NAV BUTTONS ---- */
           .navbtn div[data-testid="stButton"] > button {
             height: 28px !important;
             padding: 0 10px !important;
             font-size: 0.78rem !important;
             font-weight: 650 !important;
-            border-radius: 999px !important; /* pill */
+            border-radius: 999px !important;
             min-width: unset !important;
             width: auto !important;
           }
@@ -36,25 +34,26 @@ def top_nav(active: str = "gex"):
         unsafe_allow_html=True
     )
 
-    c1, c2, _ = st.columns([0.06, 0.6, 1])
+    c1, c2, c3, _ = st.columns([0.06, 0.06, 0.06, 1])
 
     with c1:
-        st.markdown(
-            f'<div class="navbtn {"active" if active=="gex" else ""}">',
-            unsafe_allow_html=True
-        )
-        if st.button("GEX", key=f"nav_gex"):
+        st.markdown(f'<div class="navbtn {"active" if active=="gex" else ""}">', unsafe_allow_html=True)
+        if st.button("GEX", key="nav_gex"):
             st.switch_page("app.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c2:
-        st.markdown(
-            f'<div class="navbtn {"active" if active=="lev" else ""}">',
-            unsafe_allow_html=True
-        )
-        if st.button("Leverage Equivalence", key=f"nav_lev"):
+        st.markdown(f'<div class="navbtn {"active" if active=="lev" else ""}">', unsafe_allow_html=True)
+        if st.button("Leverage Equivalence", key="nav_lev"):
             st.switch_page("pages/1_Leverage_Equivalence.py")
         st.markdown("</div>", unsafe_allow_html=True)
+
+    with c3:
+        st.markdown(f'<div class="navbtn {"active" if active=="cc" else ""}">', unsafe_allow_html=True)
+        if st.button("CC / CSP", key="nav_cc"):
+            st.switch_page("pages/2_CC_CSP.py")
+        st.markdown("</div>", unsafe_allow_html=True)
+
 
 # Optional auto-refresh
 try:
@@ -969,5 +968,4 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
-
 
