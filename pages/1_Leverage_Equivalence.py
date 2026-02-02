@@ -43,7 +43,7 @@ def top_nav(active: str = "lev"):
         unsafe_allow_html=True
     )
 
-    c1, c2 = st.columns([1, 1], gap="small")
+    c1, c2, c3 = st.columns([1, 1, 1], gap="small")
 
     with c1:
         st.markdown('<div class="navbtn {}">'.format("active" if active=="gex" else ""), unsafe_allow_html=True)
@@ -56,6 +56,13 @@ def top_nav(active: str = "lev"):
         if st.button("Leverage Equivalence", use_container_width=True):
             st.switch_page("pages/1_Leverage_Equivalence.py")
         st.markdown("</div>", unsafe_allow_html=True)
+
+    with c3:
+        st.markdown('<div class="navbtn {}">'.format("active" if active=="cc" else ""), unsafe_allow_html=True)
+        if st.button("CC / CSP", use_container_width=True):
+            st.switch_page("pages/2_CC_CSP.py")
+        st.markdown("</div>", unsafe_allow_html=True)
+
 
 top_nav(active="lev")
 
