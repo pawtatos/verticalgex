@@ -33,66 +33,45 @@ def top_nav(active: str = "cc"):
           section[data-testid="stSidebar"] { display: none; }
           div[data-testid="stAppViewContainer"] { margin-left: 0; }
 
-          .navbtn div[data-testid="stButton"] > button {
-            height: 28px !important;
-            padding: 0 10px !important;
-            font-size: 0.78rem !important;
-            font-weight: 650 !important;
-            border-radius: 999px !important;
-            min-width: unset !important;
-            width: auto !important;
+          /* Match Leverage page button look + equal width */
+          .navwrap { padding: 6px 0 10px 0; }
+          .navbtn button {
+            border-radius: 12px !important;
+            font-weight: 850 !important;
+            height: 42px !important;
           }
-          .navbtn.active div[data-testid="stButton"] > button {
-            border: 1.5px solid rgba(80,170,255,0.95) !important;
-            background: rgba(80,170,255,0.18) !important;
-            box-shadow: inset 0 -2px 0 rgba(80,170,255,0.95) !important;
+          .navbtn.active button {
+            border: 2px solid rgba(80,170,255,0.95) !important;
+            background: rgba(80,170,255,0.20) !important;
+            box-shadow: inset 0 -4px 0 rgba(80,170,255,0.95) !important;
           }
-
-          /* Narrow the whole app content so it doesn't span full screen */
-          .block-container{
-            max-width: 980px;
-            padding-top: 2.2rem;
-          }
-
-          /* Compact ticker input */
-          div[data-testid="stTextInput"] input {
-            width: 145px !important;
-            min-width: 145px !important;
-            max-width: 145px !important;
-            text-align: left;
-            font-weight: 700;
-          }
-
-          /* Slightly tighter dataframe header */
-          div[data-testid="stDataFrame"] thead tr th { font-weight: 800 !important; }
-
-          /* Make radios a bit tighter */
-          div[role="radiogroup"] label { margin-right: 14px; }
         </style>
         """,
         unsafe_allow_html=True
     )
 
-    c1, c2, c3, _ = st.columns([0.15, 0.45, 0.22, 1])
+    st.markdown('<div class="navwrap">', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns([1, 1, 1], gap="small")
 
     with c1:
         st.markdown(f'<div class="navbtn {"active" if active=="gex" else ""}">', unsafe_allow_html=True)
-        if st.button("GEX", key="nav_gex"):
+        if st.button("GEX", use_container_width=True, key="nav_gex"):
             st.switch_page("app.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c2:
         st.markdown(f'<div class="navbtn {"active" if active=="lev" else ""}">', unsafe_allow_html=True)
-        if st.button("Leverage Equivalence", key="nav_lev"):
+        if st.button("Leverage Equivalence", use_container_width=True, key="nav_lev"):
             st.switch_page("pages/1_Leverage_Equivalence.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c3:
         st.markdown(f'<div class="navbtn {"active" if active=="cc" else ""}">', unsafe_allow_html=True)
-        if st.button("CC / CSP", key="nav_cc"):
+        if st.button("CC / CSP", use_container_width=True, key="nav_cc"):
             st.switch_page("pages/2_CC_CSP.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
+    st.markdown("</div>", unsafe_allow_html=True)
 
 st.title("Covered Call / CSP Identifier")  # title first (so nav shows under)
 top_nav(active="cc")                      # nav under title
@@ -554,6 +533,7 @@ st.caption(
     "Keep Probability/Keep % is a quick approximation using delta (calls: 1−Δ, puts: 1−|Δ|). "
     "Deltas are estimated via Black–Scholes using Yahoo IV."
 )
+
 
 
 
