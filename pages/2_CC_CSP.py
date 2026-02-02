@@ -21,6 +21,10 @@ try:
 except Exception:
     YF_OK = False
 
+st.set_page_config(page_title="CC / CSP Recommender", layout="wide")
+top_nav(active="cc")
+st.title("Covered Call / CSP Identifier")
+
 def top_nav(active: str = "cc"):
     st.markdown(
         """
@@ -66,17 +70,13 @@ def top_nav(active: str = "cc"):
             st.switch_page("pages/2_CC_CSP.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
-st.set_page_config(page_title="CC / CSP Recommender", layout="wide")
-top_nav(active="cc")
-st.title("Covered Call / CSP Identifier")
-
 # ... then keep the rest of your CC/CSP code unchanged ...
 
 
 # =========================
 # Page config + CSS
 # =========================
-st.set_page_config(page_title="CC / CSP Recommender", layout="wide")
+st.set_page_config(page_title="CC / CSP", layout="wide")
 
 st.markdown(
     """
@@ -565,6 +565,7 @@ st.caption(
     "Keep Probability/Keep % is a quick approximation using delta (calls: 1−Δ, puts: 1−|Δ|). "
     "Deltas are estimated via Black–Scholes using Yahoo IV."
 )
+
 
 
 
