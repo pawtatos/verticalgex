@@ -333,7 +333,7 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
             <div style="
               font-size:14px;
               font-weight:800;
-              line-height:1.10;
+              line-height:1.20;
               color:#e6e6e6;
               display:-webkit-box;
               -webkit-line-clamp:2;
@@ -349,7 +349,7 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
               white-space:nowrap;
               overflow:hidden;
               text-overflow:ellipsis;
-              line-height:1.0;
+              line-height:1.2;
             ">{sym}</div>
           </div>
 
@@ -365,7 +365,7 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
               font-size:12px;
               font-weight:900;
               color:#e6e6e6;
-              line-height:1.0;
+              line-height:1.2;
               white-space:nowrap;
             ">{last}</div>
 
@@ -375,7 +375,7 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
               display:flex;
               gap:6px;
               white-space:nowrap;
-              line-height:2.0;
+              line-height:1.2;
             ">
               <span style="color:{c_chg};">{chg}</span>
               <span style="color:{c_pct};">{pct}</span>
@@ -968,6 +968,7 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
 
 
