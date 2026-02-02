@@ -320,7 +320,7 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
         tiles_html += f"""
         <div style="
           height:{tile_h}px;
-          padding:6px 10px;
+          padding:1px 10px;
           border-radius:10px;
           background: rgba(255,255,255,0.03);
           border:1px solid rgba(255,255,255,0.06);
@@ -333,7 +333,7 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
             <div style="
               font-size:14px;
               font-weight:800;
-              line-height:1.10;
+              line-height:2.10;
               color:#e6e6e6;
               display:-webkit-box;
               -webkit-line-clamp:2;
@@ -968,6 +968,7 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
 
 
