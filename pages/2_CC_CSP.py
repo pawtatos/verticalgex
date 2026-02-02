@@ -21,7 +21,6 @@ try:
 except Exception:
     YF_OK = False
 
-
 # =========================
 # Page config + CSS
 # =========================
@@ -101,6 +100,7 @@ top_nav(active="cc")                      # nav under title
 if not YF_OK:
     st.error("Missing dependency: yfinance. Install with: pip install yfinance")
     st.stop()
+
 
 # =========================
 # GEX-style tile system
@@ -554,6 +554,7 @@ st.caption(
     "Keep Probability/Keep % is a quick approximation using delta (calls: 1−Δ, puts: 1−|Δ|). "
     "Deltas are estimated via Black–Scholes using Yahoo IV."
 )
+
 
 
 
