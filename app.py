@@ -349,7 +349,7 @@ def render_mini_cards(title: str, df: pd.DataFrame, cols_desktop: int = 3):
               white-space:nowrap;
               overflow:hidden;
               text-overflow:ellipsis;
-              line-height:2.0;
+              line-height:1.0;
             ">{sym}</div>
           </div>
 
@@ -968,6 +968,7 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
 
 
