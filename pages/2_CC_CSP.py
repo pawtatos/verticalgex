@@ -1,4 +1,4 @@
-# app.py — CC/CSP Recommender (GEX-style tiles, refined layout + alignment fix)
+tif# app.py — CC/CSP Recommender (GEX-style tiles, refined layout + alignment fix)
 # Includes:
 # - Ticker input + Spot tile aligned on the same baseline (caption spacer fix)
 # - Strategy + Risk under ticker, above expiration
@@ -21,7 +21,7 @@ try:
 except Exception:
     YF_OK = False
 
-st.set_page_config(page_title="CC / CSP Recommender", layout="wide")
+st.set_page_config(page_title="CC / CSP Identifier", layout="wide")
 
 def top_nav(active: str = "cc"):
     st.markdown(
@@ -68,6 +68,8 @@ def top_nav(active: str = "cc"):
             st.switch_page("pages/2_CC_CSP.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
+top_nav(active="cc")
+
 # ... then keep the rest of your CC/CSP code unchanged ...
 
 
@@ -75,7 +77,6 @@ def top_nav(active: str = "cc"):
 # Page config + CSS
 # =========================
 st.set_page_config(page_title="CC / CSP", layout="wide")
-top_nav(active="cc")
 
 st.markdown(
     """
@@ -564,6 +565,7 @@ st.caption(
     "Keep Probability/Keep % is a quick approximation using delta (calls: 1−Δ, puts: 1−|Δ|). "
     "Deltas are estimated via Black–Scholes using Yahoo IV."
 )
+
 
 
 
