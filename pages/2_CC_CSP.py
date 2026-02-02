@@ -46,7 +46,7 @@ def top_nav(active: str = "cc"):
         unsafe_allow_html=True
     )
 
-    c1, c2, c3, _ = st.columns([0.20, 0.35, 0.20, 1])
+    c1, c2, c3, _ = st.columns([0.20, 0.4, 0.20, 1])
 
     with c1:
         st.markdown(f'<div class="navbtn {"active" if active=="gex" else ""}">', unsafe_allow_html=True)
@@ -565,6 +565,7 @@ st.caption(
     "Keep Probability/Keep % is a quick approximation using delta (calls: 1−Δ, puts: 1−|Δ|). "
     "Deltas are estimated via Black–Scholes using Yahoo IV."
 )
+
 
 
 
