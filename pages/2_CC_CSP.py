@@ -51,7 +51,7 @@ def top_nav(active: str = "cc"):
           /* Narrow the whole app content so it doesn't span full screen */
           .block-container{
             max-width: 980px;
-            padding-top: 1.0rem;
+            padding-top: 2.2rem;
           }
 
           /* Compact ticker input */
@@ -554,6 +554,7 @@ st.caption(
     "Keep Probability/Keep % is a quick approximation using delta (calls: 1−Δ, puts: 1−|Δ|). "
     "Deltas are estimated via Black–Scholes using Yahoo IV."
 )
+
 
 
 
