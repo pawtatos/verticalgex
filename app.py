@@ -34,7 +34,7 @@ def top_nav(active: str = "gex"):
         unsafe_allow_html=True
     )
 
-    c1, c2, c3, _ = st.columns([0.06, 0.15, 0.06, 1])
+    c1, c2, c3, _ = st.columns([0.06, 0.1, 0.06, 1])
 
     with c1:
         st.markdown(f'<div class="navbtn {"active" if active=="gex" else ""}">', unsafe_allow_html=True)
@@ -968,6 +968,7 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
 
 
