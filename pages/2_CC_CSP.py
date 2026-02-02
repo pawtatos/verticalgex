@@ -24,7 +24,7 @@ except Exception:
 # =========================
 # Page config + CSS
 # =========================
-st.set_page_config(page_title="CC / CSP Identifier", layout="wide")
+st.set_page_config(page_title="CC / CSP Identifier", layout="centered")
 
 def top_nav(active: str = "cc"):
     st.markdown(
@@ -554,6 +554,7 @@ st.caption(
     "Keep Probability/Keep % is a quick approximation using delta (calls: 1−Δ, puts: 1−|Δ|). "
     "Deltas are estimated via Black–Scholes using Yahoo IV."
 )
+
 
 
 
