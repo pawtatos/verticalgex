@@ -11,49 +11,65 @@ def top_nav(active: str = "gex"):
     st.markdown(
         """
         <style>
-          section[data-testid="stSidebar"] { display: none; }
-          div[data-testid="stAppViewContainer"] { margin-left: 0; }
+          /* Hide sidebar + built-in multipage nav */
+          [data-testid="stSidebar"] { display: none; }
+          [data-testid="stSidebarNav"] { display: none; }
+          [data-testid="collapsedControl"] { display: none; }
 
-          .navbtn div[data-testid="stButton"] > button {
-            height: 28px !important;
-            padding: 0 10px !important;
-            font-size: 0.78rem !important;
-            font-weight: 650 !important;
-            border-radius: 999px !important;
-            min-width: unset !important;
-            width: auto !important;
+          /* Center the nav row so it matches your centered pages */
+          .navwrap {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 6px 0 14px 0;
+          }
+          .navwrap div[data-testid="stHorizontalBlock"] {
+            gap: 0.65rem !important;
           }
 
-          .navbtn.active div[data-testid="stButton"] > button {
-            border: 1.5px solid rgba(80,170,255,0.95) !important;
-            background: rgba(80,170,255,0.18) !important;
-            box-shadow: inset 0 -2px 0 rgba(80,170,255,0.95) !important;
+          .navbtn button {
+            border-radius: 12px !important;
+            font-weight: 850 !important;
+            height: 42px !important;
+          }
+          .navbtn.active button {
+            border: 2px solid rgba(80,170,255,0.95) !important;
+            background: rgba(80,170,255,0.20) !important;
+            box-shadow: inset 0 -4px 0 rgba(80,170,255,0.95) !important;
           }
         </style>
         """,
         unsafe_allow_html=True
     )
 
-    c1, c2, c3, _ = st.columns([0.05, 0.13, 0.08, 1])
+    st.markdown('<div class="navwrap">', unsafe_allow_html=True)
+
+    c1, c2, c3, c4 = st.columns([1, 1, 1, 1], gap="small")
 
     with c1:
-        st.markdown(f'<div class="navbtn {"active" if active=="gex" else ""}">', unsafe_allow_html=True)
-        if st.button("GEX", key="nav_gex"):
+        st.markdown('<div class="navbtn {}">'.format("active" if active=="gex" else ""), unsafe_allow_html=True)
+        if st.button("GEX", use_container_width=True, key="nav_gex"):
             st.switch_page("app.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c2:
-        st.markdown(f'<div class="navbtn {"active" if active=="lev" else ""}">', unsafe_allow_html=True)
-        if st.button("Leverage Equivalence", key="nav_lev"):
+        st.markdown('<div class="navbtn {}">'.format("active" if active=="lev" else ""), unsafe_allow_html=True)
+        if st.button("Leveraged Converter", use_container_width=True, key="nav_lev"):
             st.switch_page("pages/1_Leverage_Equivalence.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c3:
-        st.markdown(f'<div class="navbtn {"active" if active=="cc" else ""}">', unsafe_allow_html=True)
-        if st.button("CC / CSP", key="nav_cc"):
-            st.switch_page("pages/2_CC_CSP.py")
+        st.markdown('<div class="navbtn {}">'.format("active" if active=="dca" else ""), unsafe_allow_html=True)
+        if st.button("Synthetic Put DCA", use_container_width=True, key="nav_dca"):
+            st.switch_page("pages/2_Synthetic_Put_DCA.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
+    with c4:
+        st.markdown('<div class="navbtn {}">'.format("active" if active=="cc" else ""), unsafe_allow_html=True)
+        if st.button("CC / CSP", use_container_width=True, key="nav_cc"):
+            st.switch_page("pages/3_CC_CSP.py")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # Optional auto-refresh
 try:
@@ -968,7 +984,6 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
-
 
 
 
