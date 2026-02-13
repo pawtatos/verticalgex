@@ -83,7 +83,7 @@ st.markdown(
         font-size: 14px !important;
       }
 
-      .mult-tabs { margin-top: 26px; }
+      .mult-tabs { margin-top: 8px; }
       .mult-tabs div[data-testid="stSegmentedControl"] button {
         height: 56px !important;
         border-radius: 14px !important;
@@ -280,6 +280,7 @@ with st.container(border=True):
         st.text_input("Leveraged", key="lev_in", placeholder=st.session_state.lev_ph, on_change=on_validate_lev)
 
     with c3:
+        st.markdown("""<div style='margin-top: 16px;'></div>""", unsafe_allow_html=True)
         st.markdown('<div class="mult-tabs">', unsafe_allow_html=True)
         st.segmented_control("Multiplier", options=["2X", "3X"], key="mult_in", label_visibility="collapsed")
         st.markdown("</div>", unsafe_allow_html=True)
