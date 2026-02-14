@@ -207,3 +207,88 @@ with st.container(border=True):
             """,
             unsafe_allow_html=True
         )
+# ==============
+# DCA Calculator
+# ==============
+
+st.divider()
+st.header("💰 DCA Calculator")
+st.caption("Simple calculator for calculating new average")
+
+# --- Reset mechanism (safe) ---
+if st.session_state.get("dca_reset_pending", False):
+    for k in ("dca_total_shares_txt", "dca_avg_cost_txt", "dca_new_shares_txt", "dca_new_cost_txt"):
+        st.session_state[k] = ""
+    st.session_state["dca_reset_pending"] = False
+
+with st.container(border=True):
+
+    d1, d2 = st.columns(2)
+
+    with d1:
+        total_shares_txt = st.text_input(
+            "Shares Owned",
+            value=st.session_state.get("dca_total_shares_txt", ""),
+            placeholder="Enter share quantity",
+            key="dca_total_shares_txt",
+        )
+        avg_cost_txt = st.text_input(
+            "Average Cost Basis (Cost/Share)",
+            value=st.session_state.get("dca_avg_cost_txt", ""),
+            placeholder="Enter cost per share",
+            key="dca_avg_cost_txt",
+        )
+
+    with d2:
+        new_shares_txt = st.text_input(
+            "New Shares Quantity",
+            value=st.session_state.get("dca_new_shares_txt", ""),
+            placeholder="Enter share quantity",
+            key="dca_new_shares_txt",
+        )
+        new_cost_txt = st.text_input(
+            "New Share Price",
+            value=st.session_state.get("dca_new_cost_txt", ""),
+            placeholder="Enter purchase price",
+            key="dca_new_cost_txt",
+        )
+
+    # --- Reset button in the middle ---
+    sp1, mid, sp2 = st.columns([4, 1, 4])
+    
+    with mid:
+        if st.button("Reset", key="dca_reset_btn", use_container_width=True):
+            st.session_state["dca_reset_pending"] = True
+            st.rerun()
+
+    st.divider()
+
+    total_shares = parse_float(total_shares_txt)
+    avg_cost = parse_float(avg_cost_txt)
+    new_shares = parse_float(new_shares_txt)
+    new_cost = parse_float(new_cost_txt)
+
+    if any(v is None for v in (total_shares, avg_cost, new_shares, new_cost)):
+        st.info("Enter valid numbers for all fields.")
+    elif total_shares < 0 or new_shares < 0 or avg_cost < 0 or new_cost < 0:
+        st.warning("Values must be non-negative.")
+    else:
+        old_total_cost = total_shares * avg_cost
+        new_total_cost = new_shares * new_cost
+        combined_shares = total_shares + new_shares
+
+        if combined_shares == 0:
+            st.warning("Total shares after purchase is 0. Nothing to calculate.")
+        else:
+            new_avg = (old_total_cost + new_total_cost) / combined_shares
+
+            m1, m2, m3 = st.columns(3)
+            with m1:
+                small_metric("Current Cost Basis", money_or_none(old_total_cost))
+            with m2:
+                small_metric("New Additional Basis", money_or_none(new_total_cost))
+            with m3:
+                small_metric("New Average Cost Basis", money_or_none(new_avg))
+
+            st.caption(f"New total shares: **{combined_shares:,.0f}**")
+
