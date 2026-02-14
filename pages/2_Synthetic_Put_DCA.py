@@ -274,13 +274,18 @@ with st.container(border=True):
         else:
             new_avg = (old_total_cost + new_total_cost) / combined_shares
 
-            m1, m2, m3 = st.columns(3)
+            delta_avg = new_avg - avg_cost # $/Share change vs old average cost basis
+            delta_str = f"{'+' if delta_avg >= 0 else ''}${delta_avg:,.2f}"            
+
+            m1, m2, m3, m4 = st.columns(4)
             with m1:
                 small_metric("Current Cost Basis", money_or_none(old_total_cost))
             with m2:
                 small_metric("New Additional Basis", money_or_none(new_total_cost))
             with m3:
                 small_metric("New Average Cost Basis", money_or_none(new_avg))
+            with m4:
+                small_metric("Δ Average Basis (Cost/share)", delta_str)
 
             st.caption(f"New total shares quantity: **{combined_shares:,.0f}**")
 
@@ -290,4 +295,3 @@ with st.container(border=True):
                 if st.button("Reset", key="dca_reset_btn", use_container_width=True):
                     st.session_state["dca_reset_pending"] = True
                     st.rerun()
-
