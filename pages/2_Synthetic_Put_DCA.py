@@ -212,8 +212,8 @@ with st.container(border=True):
 # ==============
 
 st.divider()
-st.header("💰 DCA Calculator")
-st.caption("Simple calculator for calculating new average")
+st.header("💰 Dollar Cost Average (DCA) Calculator")
+st.caption("Simple weighted-average update after a new buy.")
 
 # --- Reset mechanism (safe) ---
 if st.session_state.get("dca_reset_pending", False):
@@ -233,7 +233,7 @@ with st.container(border=True):
             key="dca_total_shares_txt",
         )
         avg_cost_txt = st.text_input(
-            "Average Cost Basis (Cost/Share)",
+            "Average Cost Basis (Cost/share)",
             value=st.session_state.get("dca_avg_cost_txt", ""),
             placeholder="Enter cost per share",
             key="dca_avg_cost_txt",
@@ -247,19 +247,11 @@ with st.container(border=True):
             key="dca_new_shares_txt",
         )
         new_cost_txt = st.text_input(
-            "New Share Price",
+            "New share price",
             value=st.session_state.get("dca_new_cost_txt", ""),
             placeholder="Enter purchase price",
             key="dca_new_cost_txt",
         )
-
-    # --- Reset button in the middle ---
-    sp1, mid, sp2 = st.columns([4, 1, 4])
-    
-    with mid:
-        if st.button("Reset", key="dca_reset_btn", use_container_width=True):
-            st.session_state["dca_reset_pending"] = True
-            st.rerun()
 
     st.divider()
 
@@ -290,5 +282,12 @@ with st.container(border=True):
             with m3:
                 small_metric("New Average Cost Basis", money_or_none(new_avg))
 
-            st.caption(f"New total shares: **{combined_shares:,.0f}**")
+            st.caption(f"New total shares quantity: **{combined_shares:,.0f}**")
+
+            # Reset appears ONLY after valid calculation / metrics render
+            sp1, mid, sp2 = st.columns([4, 1, 4])
+            with mid:
+                if st.button("Reset", key="dca_reset_btn", use_container_width=True):
+                    st.session_state["dca_reset_pending"] = True
+                    st.rerun()
 
