@@ -228,14 +228,78 @@ def _norm_cdf(x: float) -> float:
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
 
-def bs_delta(S, K, T, r, sigma, option_type):
+def bs_price(S, K, T, r, q, sigma, option_type):
+    """Black-Scholes price with continuous dividend yield q."""
     if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
         return np.nan
     try:
-        d1 = (math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * math.sqrt(T))
+        vol_sqrt = sigma * math.sqrt(T)
+        d1 = (math.log(S / K) + (r - q + 0.5 * sigma * sigma) * T) / vol_sqrt
+        d2 = d1 - vol_sqrt
+        if option_type == "call":
+            return (S * math.exp(-q * T) * _norm_cdf(d1)) - (K * math.exp(-r * T) * _norm_cdf(d2))
+        else:
+            return (K * math.exp(-r * T) * _norm_cdf(-d2)) - (S * math.exp(-q * T) * _norm_cdf(-d1))
     except Exception:
         return np.nan
-    return _norm_cdf(d1) if option_type == "call" else _norm_cdf(d1) - 1.0
+
+
+def bs_delta(S, K, T, r, q, sigma, option_type):
+    """Black-Scholes delta with continuous dividend yield q."""
+    if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
+        return np.nan
+    try:
+        d1 = (math.log(S / K) + (r - q + 0.5 * sigma * sigma) * T) / (sigma * math.sqrt(T))
+    except Exception:
+        return np.nan
+    if option_type == "call":
+        return math.exp(-q * T) * _norm_cdf(d1)
+    else:
+        return math.exp(-q * T) * (_norm_cdf(d1) - 1.0)
+
+
+def implied_vol_from_price(price, S, K, T, r, q, option_type, lo=1e-6, hi=5.0, iters=60):
+    """Solve for IV using bisection. Returns np.nan if no solution."""
+    price = float(price) if price is not None else np.nan
+    if not np.isfinite(price) or price <= 0 or S <= 0 or K <= 0 or T <= 0:
+        return np.nan
+
+    # No-arbitrage lower bounds
+    disc_S = S * math.exp(-q * T)
+    disc_K = K * math.exp(-r * T)
+    if option_type == "call":
+        lb = max(disc_S - disc_K, 0.0)
+        ub = disc_S  # loose but ok
+    else:
+        lb = max(disc_K - disc_S, 0.0)
+        ub = disc_K
+
+    if price < lb - 1e-6 or price > ub + 1e-6:
+        return np.nan
+
+    f_lo = bs_price(S, K, T, r, q, lo, option_type) - price
+    f_hi = bs_price(S, K, T, r, q, hi, option_type) - price
+    if not np.isfinite(f_lo) or not np.isfinite(f_hi):
+        return np.nan
+
+    # If not bracketed, bail
+    if f_lo * f_hi > 0:
+        return np.nan
+
+    a, b = lo, hi
+    fa, fb = f_lo, f_hi
+    for _ in range(iters):
+        m = 0.5 * (a + b)
+        fm = bs_price(S, K, T, r, q, m, option_type) - price
+        if not np.isfinite(fm):
+            return np.nan
+        if abs(fm) < 1e-8:
+            return m
+        if fa * fm <= 0:
+            b, fb = m, fm
+        else:
+            a, fa = m, fm
+    return 0.5 * (a + b)
 
 
 def annualized_yield(premium_dollars, denom_dollars, dte):
@@ -299,22 +363,46 @@ RISK_BUCKETS = {
 def fetch_spot_and_exps(ticker: str):
     t = yf.Ticker(ticker)
 
-    spot = None
+    spot_live = None
+    spot_close = None
+    div_yield = 0.0
+
+    # Live / fast quote (can be newer than the option chain)
     try:
         fi = getattr(t, "fast_info", None)
         if fi:
-            spot = fi.get("last_price") or fi.get("lastPrice")
-            spot = float(spot) if spot is not None else None
+            spot_live = fi.get("last_price") or fi.get("lastPrice") or fi.get("regularMarketPrice")
+            spot_live = float(spot_live) if spot_live is not None else None
     except Exception:
         pass
 
-    if spot is None:
-        try:
-            hist = t.history(period="5d")
-            if hist is not None and not hist.empty:
-                spot = float(hist["Close"].iloc[-1])
-        except Exception:
-            pass
+    # Previous close (often aligns better with delayed option chain snapshots)
+    try:
+        hist = t.history(period="10d")
+        if hist is not None and not hist.empty:
+            spot_close = float(hist["Close"].iloc[-1])
+    except Exception:
+        pass
+
+    # Dividend yield (continuous approximation)
+    try:
+        info = getattr(t, "info", {}) or {}
+        dy = info.get("dividendYield")
+        if dy is None:
+            dy = info.get("trailingAnnualDividendYield")
+        if dy is None:
+            dy = info.get("forwardAnnualDividendYield")
+        dy = float(dy) if dy is not None else 0.0
+        if np.isfinite(dy) and 0 <= dy <= 0.20:
+            div_yield = dy
+    except Exception:
+        pass
+
+    # Fallbacks
+    if spot_live is None and spot_close is not None:
+        spot_live = spot_close
+    if spot_close is None and spot_live is not None:
+        spot_close = spot_live
 
     exps = []
     try:
@@ -322,7 +410,7 @@ def fetch_spot_and_exps(ticker: str):
     except Exception:
         exps = []
 
-    return spot, exps
+    return spot_live, spot_close, div_yield, exps
 
 
 @st.cache_data(ttl=120)
@@ -367,7 +455,16 @@ if not ticker:
     st.stop()
 
 with st.spinner("Loading spot + expirations..."):
-    spot, expirations = fetch_spot_and_exps(ticker)
+    spot_live, spot_close, div_yield, expirations = fetch_spot_and_exps(ticker)
+
+spot_source = st.radio(
+    "Spot source",
+    ["Previous close (recommended)", "Live (fast quote)"],
+    horizontal=True,
+    index=0,
+    help="If your broker deltas don't match, 'Previous close' often aligns better with delayed option chains."
+)
+spot = spot_close if spot_source.startswith("Previous") else spot_live
 
 if spot is None or not np.isfinite(spot) or not expirations:
     spot_holder.markdown(snap_cell("Spot", "—", value_px=14, value_weight=800), unsafe_allow_html=True)
@@ -421,9 +518,27 @@ mid = (df["bid"] + df["ask"]) / 2.0
 df["price_used"] = np.where(np.isfinite(mid) & (mid > 0), mid, df["lastPrice"])
 df["premium_$"] = df["price_used"] * 100.0
 
+q = float(div_yield) if div_yield is not None else 0.0
+
+# Prefer IV implied from the option's own price (mid/last) so computed delta matches what markets use.
+iv_model = []
+for k, px, iv_feed in zip(df["K"], df["price_used"], df["iv"]):
+    if np.isfinite(k) and np.isfinite(px) and px > 0:
+        iv_solved = implied_vol_from_price(px, float(spot), float(k), T, r, q, opt_type)
+    else:
+        iv_solved = np.nan
+
+    # Fallback to feed IV if solver fails
+    if not np.isfinite(iv_solved):
+        iv_solved = iv_feed
+
+    iv_model.append(iv_solved)
+
+df["iv_model"] = iv_model
+
 df["delta"] = [
-    bs_delta(float(spot), k, T, r, iv, opt_type) if np.isfinite(k) and np.isfinite(iv) else np.nan
-    for k, iv in zip(df["K"], df["iv"])
+    bs_delta(float(spot), float(k), T, r, q, float(iv), opt_type) if np.isfinite(k) and np.isfinite(iv) else np.nan
+    for k, iv in zip(df["K"], df["iv_model"])
 ]
 df["abs_delta"] = df["delta"].abs()
 
