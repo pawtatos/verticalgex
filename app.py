@@ -749,7 +749,7 @@ def set_all(ticker: str, expiries: list[str], value: bool):
 left, right = st.columns([1, 2], gap="large")
 
 with left:
-    ticker = st.text_input("Ticker", "").upper().strip()
+    ticker = st.text_input("Ticker", "HOOD").upper().strip()
     bucket = st.radio("Expiration", ["Nearest expiration date", "All expiries"], horizontal=False)
 
     if not YF_OK:
@@ -984,6 +984,7 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
 
 
