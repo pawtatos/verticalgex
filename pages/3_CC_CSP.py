@@ -5,241 +5,567 @@
 # - Recommended Match tile (green highlight)
 # - Metrics split into 2 rows of 3 (Premium/Total/Return then Delta/Keep/Annualized)
 # - Narrow app width (doesn't use entire screen)
+# - Compare Strikes (Top 5)
 
 import math
+import datetime as dt
 from dataclasses import dataclass
-from datetime import datetime, date
 
 import numpy as np
 import pandas as pd
 import streamlit as st
-import yfinance as yf
 
+try:
+    import yfinance as yf
+    YF_OK = True
+except Exception:
+    YF_OK = False
 
 # =========================
 # Page config + CSS
 # =========================
-st.set_page_config(page_title="CC/CSP Identifier", page_icon="🧩", layout="centered")
+st.set_page_config(page_title="CC / CSP Identifier", layout="centered")
 
-CSS = """
-<style>
-/* Narrow content wrapper */
-.block-container { max-width: 920px; padding-top: 1.25rem; }
-
-/* Header */
-h1, h2, h3 { letter-spacing: -0.02em; }
-
-/* Tile grid */
-.tile-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-@media (max-width: 880px){
-  .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (max-width: 560px){
-  .tile-grid { grid-template-columns: 1fr; }
-}
-.tile {
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.04);
-  border-radius: 14px;
-  padding: 12px 14px;
-  box-shadow: 0 1px 10px rgba(0,0,0,0.12);
-}
-.tile .label {
-  font-size: 0.83rem;
-  opacity: 0.75;
-  margin-bottom: 6px;
-}
-.tile .value {
-  font-size: 1.25rem;
-  font-weight: 650;
-  line-height: 1.2;
-}
-.tile .value_small {
-  font-size: 1.05rem;
-  font-weight: 650;
-  line-height: 1.25;
-}
-.tile.reco {
-  border-color: rgba(54, 235, 136, 0.55);
-  box-shadow: 0 0 0 2px rgba(54, 235, 136, 0.14) inset, 0 1px 12px rgba(0,0,0,0.16);
-}
-
-/* Compact radio buttons */
-div[role="radiogroup"] label { padding: 0.12rem 0.45rem; }
-
-/* Helper for aligning the Spot tile with ticker input caption */
-.caption-spacer { height: 1.4rem; } /* matches st.text_input label/caption space */
-</style>
-"""
-st.markdown(CSS, unsafe_allow_html=True)
-
-
-# =========================
-# Helpers
-# =========================
-@dataclass
-class RiskBucket:
-    dmin: float
-    dmax: float
-
-RISK_BUCKETS = {
-    "Aggressive": RiskBucket(0.25, 0.40),
-    "Neutral": RiskBucket(0.15, 0.25),
-    "Risk averse": RiskBucket(0.08, 0.15),
-}
-
-def fmt_money(x: float) -> str:
-    if x is None or not np.isfinite(x):
-        return "—"
-    return f"${x:,.2f}"
-
-def fmt_pct(x: float, decimals: int = 2) -> str:
-    if x is None or not np.isfinite(x):
-        return "—"
-    return f"{x*100:.{decimals}f}%"
-
-def fmt_num(x: float, decimals: int = 2) -> str:
-    if x is None or not np.isfinite(x):
-        return "—"
-    return f"{x:.{decimals}f}"
-
-def fmt_int(x) -> str:
-    try:
-        x = int(x)
-        return f"{x:,}"
-    except Exception:
-        return "—"
-
-def strike_str(k: float) -> str:
-    if not np.isfinite(k):
-        return "—"
-    if abs(k - round(k)) < 1e-8:
-        return f"{int(round(k))}"
-    return f"{k:.2f}"
-
-def years_to_expiry(exp_date: date) -> float:
-    today = date.today()
-    days = (exp_date - today).days
-    return max(days, 0) / 365.0
-
-def dte(exp_date: date) -> int:
-    today = date.today()
-    return max((exp_date - today).days, 0)
-
-def fmt_exp_pretty(exp: str) -> str:
-    # yfinance returns yyyy-mm-dd
-    try:
-        dt = datetime.strptime(exp, "%Y-%m-%d")
-        return dt.strftime("%b %d, %Y")
-    except Exception:
-        return exp
-
-def tile_grid(items):
-    html = '<div class="tile-grid">'
-    for it in items:
-        extra_cls = "reco" if it.get("reco") else ""
-        value_class = "value_small" if it.get("small") else "value"
-        html += f"""
-          <div class="tile {extra_cls}">
-            <div class="label">{it['label']}</div>
-            <div class="{value_class}">{it['value']}</div>
-          </div>
+def top_nav(active: str = "cc"):
+    st.markdown(
         """
+        <style>
+          section[data-testid="stSidebar"] { display: none; }
+          div[data-testid="stAppViewContainer"] { margin-left: 0; }
+
+          /* Match Leverage page button look + equal width */
+          .navwrap { padding: 6px 0 10px 0; }
+          .navbtn button {
+            border-radius: 12px !important;
+            font-weight: 850 !important;
+            height: 42px !important;
+          }
+          .navbtn.active button {
+            border: 2px solid rgba(80,170,255,0.95) !important;
+            background: rgba(80,170,255,0.20) !important;
+            box-shadow: inset 0 -4px 0 rgba(80,170,255,0.95) !important;
+          }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown('<div class="navwrap">', unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns([1, 1, 1, 1], gap="small")
+
+    with c1:
+        st.markdown(f'<div class="navbtn {"active" if active=="gex" else ""}">', unsafe_allow_html=True)
+        if st.button("GEX", use_container_width=True, key="nav_gex"):
+            st.switch_page("app.py")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with c2:
+        st.markdown(f'<div class="navbtn {"active" if active=="lev" else ""}">', unsafe_allow_html=True)
+        if st.button("Leveraged Converter", use_container_width=True, key="nav_lev"):
+            st.switch_page("pages/1_Leverage_Equivalence.py")
+        st.markdown("</div>", unsafe_allow_html=True)
+    with c3:
+        st.markdown('<div class="navbtn {}">'.format("active" if active=="dca" else ""), unsafe_allow_html=True)
+        if st.button("Synthetic Put DCA", use_container_width=True):
+            st.switch_page("pages/2_Synthetic_Put_DCA.py")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+    with c4:
+        st.markdown(f'<div class="navbtn {"active" if active=="cc" else ""}">', unsafe_allow_html=True)
+        if st.button("CC / CSP", use_container_width=True, key="nav_cc"):
+            st.switch_page("pages/3_CC_CSP.py")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+top_nav(active="cc")                      # nav under title
+st.title("Covered Call / CSP Identifier")  # title first (so nav shows under)
+
+if not YF_OK:
+    st.error("Missing dependency: yfinance. Install with: pip install yfinance")
+    st.stop()
+
+
+# =========================
+# GEX-style tile system
+# =========================
+def snap_cell(
+    label: str,
+    value: str,
+    label_px: int = 9,
+    value_px: int = 14,
+    wrap_value: bool = False,
+    border_rgba: str = "rgba(255,255,255,0.06)",
+    bg_rgba: str = "rgba(255,255,255,0.03)",
+    value_color: str = "#e6e6e6",
+    value_weight: int = 700,
+):
+    white_space = "normal" if wrap_value else "nowrap"
+    return f"""
+    <div style="
+      padding:6px 6px 5px 10px;
+      border-radius:10px;
+      background:{bg_rgba};
+      border:1px solid {border_rgba};
+      min-width:0;
+    ">
+      <div style="
+        font-size:{label_px}px;
+        opacity:0.78;
+        line-height:1.1;
+        margin-bottom:3px;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        color:#cfcfcf;
+      ">{label}</div>
+
+      <div style="
+        font-size:{value_px}px;
+        font-weight:{value_weight};
+        line-height:1.15;
+        white-space:{white_space};
+        overflow:hidden;
+        text-overflow:ellipsis;
+        word-break:break-word;
+        color:{value_color};
+      ">{value}</div>
+    </div>
+    """
+
+
+def tile_grid(items, cols: int = 3):
+    html = f"""
+    <div style="
+      display:grid;
+      grid-template-columns: repeat({cols}, minmax(0, 1fr));
+      gap:10px 14px;
+      margin-top:6px;
+      margin-bottom:8px;
+    ">
+    """
+    for it in items:
+        html += snap_cell(
+            it["label"],
+            it["value"],
+            label_px=it.get("label_px", 9),
+            value_px=it.get("value_px", 14),
+            wrap_value=it.get("wrap", False),
+            border_rgba=it.get("border", "rgba(255,255,255,0.06)"),
+            bg_rgba=it.get("bg", "rgba(255,255,255,0.03)"),
+            value_color=it.get("value_color", "#e6e6e6"),
+            value_weight=it.get("value_weight", 700),
+        )
     html += "</div>"
     st.markdown(html, unsafe_allow_html=True)
 
-def norm_cdf(x: float) -> float:
+# =========================
+# Value-only tile for spot
+# =========================
+def snap_value_only(
+    value: str,
+    value_px: int = 14,
+    value_weight: int = 800,
+    border_rgba: str = "rgba(255,255,255,0.06)",
+    bg_rgba: str = "rgba(255,255,255,0.03)",
+    value_color: str = "#e6e6e6",
+):
+    return f"""
+    <div style="
+      padding:10px 10px 13px 12px;
+      border-radius:10px;
+      background:{bg_rgba};
+      border:1px solid {border_rgba};
+      min-width:0;
+    ">
+      <div style="
+        font-size:{value_px}px;
+        font-weight:{value_weight};
+        line-height:1.15;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        color:{value_color};
+      ">{value}</div>
+    </div>
+    """
+    
+# =========================
+# Helpers
+# =========================
+def money2(x):
+    return "—" if not np.isfinite(x) else f"${x:,.2f}"
+
+
+def money0(x):
+    return "—" if not np.isfinite(x) else f"${x:,.0f}"
+
+
+def pct1(x):
+    return "—" if not np.isfinite(x) else f"{x * 100:.1f}%"
+
+
+def pct0(x):
+    return "—" if not np.isfinite(x) else f"{x * 100:.0f}%"
+
+
+def strike_str(k):
+    if not np.isfinite(k):
+        return "—"
+    s = f"{k:,.2f}".rstrip("0").rstrip(".")
+    return f"${s}"
+
+
+def fmt_exp_pretty(exp_yyyy_mm_dd: str) -> str:
+    try:
+        d = dt.datetime.strptime(exp_yyyy_mm_dd, "%Y-%m-%d").date()
+        return d.strftime("%A, %b %d").replace(" 0", " ")
+    except Exception:
+        return exp_yyyy_mm_dd
+
+
+def _norm_cdf(x: float) -> float:
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
-def bs_delta(S: float, K: float, T: float, r: float, sigma: float, opt_type: str) -> float:
-    """
-    Black-Scholes delta (no dividends).
-    opt_type: "call" or "put"
-    """
+
+def bs_delta(S, K, T, r, sigma, option_type):
     if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
         return np.nan
     try:
         d1 = (math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * math.sqrt(T))
     except Exception:
         return np.nan
+    return _norm_cdf(d1) if option_type == "call" else _norm_cdf(d1) - 1.0
 
-    if opt_type == "call":
-        return norm_cdf(d1)
-    else:
-        return norm_cdf(d1) - 1.0
 
-def annualized_yield(premium_dollars: float, denom_dollars: float, dte_days: int) -> float:
-    if not np.isfinite(premium_dollars) or not np.isfinite(denom_dollars) or denom_dollars <= 0 or dte_days <= 0:
+def annualized_yield(premium_dollars, denom_dollars, dte):
+    if denom_dollars <= 0 or dte <= 0:
         return np.nan
-    period = premium_dollars / denom_dollars
-    return (1.0 + period) ** (365.0 / dte_days) - 1.0
-
-def final_score(ann_yield: float, bid: float, ask: float, oi: float) -> float:
-    """
-    A simple ranking score:
-    - Higher annualized yield is better
-    - Tighter spreads are better
-    - Higher open interest is better (log-scaled)
-    """
-    if not np.isfinite(ann_yield):
-        return -np.inf
-
-    spread = np.nan
-    if np.isfinite(bid) and np.isfinite(ask) and ask > 0:
-        spread = (ask - bid) / ask
-
-    spread_pen = 0.0
-    if np.isfinite(spread):
-        spread_pen = min(max(spread, 0.0), 1.0)  # 0..1
-
-    oi_boost = 0.0
-    if np.isfinite(oi) and oi > 0:
-        oi_boost = math.log10(oi + 10.0) / 5.0  # ~0..1 range
-
-    return (ann_yield * 100.0) + (oi_boost * 2.0) - (spread_pen * 3.0)
+    return (premium_dollars / denom_dollars) * (365.0 / dte)
 
 
-@st.cache_data(ttl=60 * 10, show_spinner=False)
-def fetch_spot(ticker: str) -> float:
+def safe_float(x):
     try:
-        t = yf.Ticker(ticker)
-        # fast_info usually best for spot
+        return float(x)
+    except Exception:
+        return np.nan
+
+
+def liquidity_penalty(bid, ask):
+    bid, ask = safe_float(bid), safe_float(ask)
+    if not np.isfinite(bid) or not np.isfinite(ask) or ask <= 0:
+        return 0.75
+    mid = (bid + ask) / 2.0
+    if mid <= 0:
+        return 0.70
+    spread = (ask - bid) / mid
+    return float(np.clip(1.0 - 2.5 * spread, 0.20, 1.00))
+
+
+def oi_bonus(oi):
+    oi = safe_float(oi)
+    if not np.isfinite(oi) or oi <= 0:
+        return 0.95
+    return float(np.clip(0.90 + 0.06 * math.log10(oi + 1.0), 0.90, 1.20))
+
+
+def final_score(ann_yld, bid, ask, oi):
+    if not np.isfinite(ann_yld):
+        return np.nan
+    return ann_yld * liquidity_penalty(bid, ask) * oi_bonus(oi)
+
+
+# =========================
+# Risk buckets (ABS delta)
+# =========================
+@dataclass
+# delta ranges interpreted as ABS(delta)
+class RiskBucket:
+    dmin: float
+    dmax: float
+
+
+RISK_BUCKETS = {
+    "Aggressive": RiskBucket(0.30, 0.50),
+    "Neutral": RiskBucket(0.15, 0.30),
+    "Risk averse": RiskBucket(0.05, 0.15),
+}
+
+
+# =========================
+# Data fetch (cache-safe)
+# =========================
+@st.cache_data(ttl=120)
+def fetch_spot_and_exps(ticker: str):
+    t = yf.Ticker(ticker)
+
+    spot = None
+    try:
         fi = getattr(t, "fast_info", None)
-        if fi and "lastPrice" in fi and fi["lastPrice"] is not None:
-            return float(fi["lastPrice"])
-        # fallback to recent close
-        hist = t.history(period="5d")
-        if not hist.empty:
-            return float(hist["Close"].iloc[-1])
+        if fi:
+            spot = fi.get("last_price") or fi.get("lastPrice")
+            spot = float(spot) if spot is not None else None
     except Exception:
         pass
-    return np.nan
 
-@st.cache_data(ttl=60 * 10, show_spinner=False)
-def fetch_expirations(ticker: str):
+    if spot is None:
+        try:
+            hist = t.history(period="5d")
+            if hist is not None and not hist.empty:
+                spot = float(hist["Close"].iloc[-1])
+        except Exception:
+            pass
+
+    exps = []
     try:
-        t = yf.Ticker(ticker)
-        return list(getattr(t, "options", []) or [])
+        exps = list(t.options)
     except Exception:
-        return []
+        exps = []
 
-@st.cache_data(ttl=60 * 10, show_spinner=False)
+    return spot, exps
+
+
+@st.cache_data(ttl=120)
 def fetch_chain(ticker: str, exp: str):
-    t = yf.Ticker(ticker)
-    chain = t.option_chain(exp)
-    return chain.calls.copy(), chain.puts.copy()
+    oc = yf.Ticker(ticker).option_chain(exp)
+    return oc.calls.copy(), oc.puts.copy()
 
 
 # =========================
-# UI — Header
+# Controls (alignment fixed)
 # =========================
-st.title("🧩 Covered Call / CSP Identifier")
-st.caption("Find a strike that matches your risk bucket and ranks by annualized yield, liquidity, and spreads.")
+# Row 1: Ticker input + Spot tile aligned by adding a caption spacer in Spot column
+row1 = st.columns([0.22, 0.28, 0.50], vertical_alignment="top")
+
+LABEL_STYLE = "font-size:12px;opacity:0.78;margin:0 0 6px 0;color:#cfcfcf;"
+
+with row1[0]:
+    st.markdown(f"<div style='{LABEL_STYLE}'>Ticker</div>", unsafe_allow_html=True)
+    ticker = st.text_input(
+        label="ticker",
+        value="",
+        placeholder="Input a ticker",
+        max_chars=5,
+        label_visibility="collapsed",
+    ).strip().upper()
+
+with row1[1]:
+    st.markdown(f"<div style='{LABEL_STYLE}'>Spot</div>", unsafe_allow_html=True)
+    spot_holder = st.empty()
+
+with row1[2]:
+    st.empty()
+
+# Row 2/3: Strategy + Risk UNDER ticker, ABOVE expiration
+mode = st.radio("Strategy", ["Covered Call", "Cash-Secured Put"], horizontal=True)
+risk = st.radio("Risk tolerance", ["Aggressive", "Neutral", "Risk averse"], horizontal=True, index=1)
+bucket = RISK_BUCKETS[risk]
+
+if not ticker:
+    spot_holder.markdown(snap_cell("Spot", "—", value_px=14, value_weight=800), unsafe_allow_html=True)
+    st.info("Enter a ticker to load expirations and compare strikes.")
+    st.stop()
+
+with st.spinner("Loading spot + expirations..."):
+    spot, expirations = fetch_spot_and_exps(ticker)
+
+if spot is None or not np.isfinite(spot) or not expirations:
+    spot_holder.markdown(snap_cell("Spot", "—", value_px=14, value_weight=800), unsafe_allow_html=True)
+    st.error("Invalid ticker or no options available.")
+    st.stop()
+
+spot_holder.markdown(
+    snap_value_only(money2(float(spot)), value_px=14, value_weight=800),
+    unsafe_allow_html=True,
+)
+
+# Expiration below Strategy/Risk
+exp = st.selectbox("Expiration date", expirations, index=0)
+
+today = dt.date.today()
+dte = max((dt.datetime.strptime(exp, "%Y-%m-%d").date() - today).days, 0)
+T = dte / 365.0
+r = 0.05
+
+if dte <= 0:
+    st.warning("Select a future expiration.")
+    st.stop()
+
+# =========================
+# Fetch option chain
+# =========================
+with st.spinner("Fetching option chain..."):
+    calls, puts = fetch_chain(ticker, exp)
+
+opt_type = "call" if mode == "Covered Call" else "put"
+df = calls.copy() if opt_type == "call" else puts.copy()
+
+for c in ["strike", "bid", "ask", "lastPrice", "openInterest", "impliedVolatility"]:
+    if c not in df.columns:
+        df[c] = np.nan
+
+df["K"] = pd.to_numeric(df["strike"], errors="coerce")
+df["bid"] = pd.to_numeric(df["bid"], errors="coerce")
+df["ask"] = pd.to_numeric(df["ask"], errors="coerce")
+df["lastPrice"] = pd.to_numeric(df["lastPrice"], errors="coerce")
+df["oi"] = pd.to_numeric(df["openInterest"], errors="coerce")
+df["iv"] = pd.to_numeric(df["impliedVolatility"], errors="coerce")
+
+# --- Normalize IV scale (some feeds return IV in % points, e.g., 80 instead of 0.80)
+df.loc[df["iv"] > 5, "iv"] = df.loc[df["iv"] > 5, "iv"] / 100.0
+# Filter clearly bad IV values
+df.loc[(df["iv"] <= 0) | (df["iv"] > 3.0), "iv"] = np.nan
 
 
+mid = (df["bid"] + df["ask"]) / 2.0
+df["price_used"] = np.where(np.isfinite(mid) & (mid > 0), mid, df["lastPrice"])
+df["premium_$"] = df["price_used"] * 100.0
+
+df["delta"] = [
+    bs_delta(float(spot), k, T, r, iv, opt_type) if np.isfinite(k) and np.isfinite(iv) else np.nan
+    for k, iv in zip(df["K"], df["iv"])
+]
+df["abs_delta"] = df["delta"].abs()
+
+# OTM filter + denom + keep proxy
+if opt_type == "call":
+    df = df[df["K"] >= float(spot)].copy()
+
+    # --- Backstop: prevent absurd far-OTM strikes if chain/IV glitches
+    max_otm = {"Aggressive": 0.60, "Neutral": 0.35, "Risk averse": 0.20}.get(risk, 0.35)
+    df = df[df["K"] <= float(spot) * (1.0 + max_otm)].copy()
+
+    df["denom_$"] = float(spot) * 100.0
+    df["keep_%"] = 1.0 - df["delta"]
+else:
+    df = df[df["K"] <= float(spot)].copy()
+    df["denom_$"] = df["K"] * 100.0
+    df["keep_%"] = 1.0 - df["abs_delta"]
+
+df["return_%"] = df["premium_$"] / df["denom_$"]
+df["ann_%"] = df.apply(lambda row: annualized_yield(row["premium_$"], row["denom_$"], dte), axis=1)
+df["score"] = df.apply(lambda row: final_score(row["ann_%"], row["bid"], row["ask"], row["oi"]), axis=1)
+
+df = df[
+    np.isfinite(df["abs_delta"]) &
+    (df["abs_delta"] >= bucket.dmin) &
+    (df["abs_delta"] <= bucket.dmax) &
+    np.isfinite(df["price_used"]) & (df["price_used"] > 0) &
+    np.isfinite(df["ann_%"]) & (df["ann_%"] > 0)
+].copy()
+
+if df.empty:
+    st.warning("No strikes match your delta bucket + OTM filter. Try another expiration or risk tolerance.")
+    st.stop()
+
+df = df.sort_values("score", ascending=False).reset_index(drop=True)
+best = df.iloc[0]
+top = df.head(5).copy()
+
 # =========================
-# UI — Input Row (Ticker
+# Recommended Match tile
+# =========================
+strike = float(best["K"])
+strike_label = strike_str(strike)
+pretty_exp = fmt_exp_pretty(exp)
+
+recommended_value = (
+    f"{strike_label} Strike<br/>"
+    f"<span style='opacity:0.85;'>Expiration {pretty_exp} ({dte} DTE)</span>"
+)
+
+tile_grid(
+    items=[
+        {
+            "label": "✅ Recommended Match",
+            "value": recommended_value,
+            "label_px": 10,
+            "value_px": 18,
+            "wrap": True,
+            "border": "rgba(25, 211, 162, 0.55)",
+            "bg": "rgba(0, 70, 60, 0.14)",
+            "value_weight": 800,
+        }
+    ],
+    cols=1,
+)
+
+# =========================
+# Metrics in 2 rows of 3
+# =========================
+premium_per_share = float(best["price_used"])
+total_premium = float(best["premium_$"])  # 1 contract (100 shares)
+ret = float(best["return_%"])
+ann = float(best["ann_%"])
+delta = float(best["delta"])
+keep_p = float(best["keep_%"])
+
+keep_color = "#19d3a2" if keep_p >= 0.75 else ("#ff5c5c" if keep_p < 0.60 else "#ffcc66")
+
+tile_grid(
+    items=[
+        {"label": "Premium", "value": f"<span style='color:#19d3a2;font-weight:800;'>{money2(premium_per_share)}</span>", "value_px": 16, "wrap": True},
+        {"label": "Total Premium", "value": f"<span style='color:#19d3a2;font-weight:800;'>{money0(total_premium)}</span>", "value_px": 16, "wrap": True},
+        {"label": "Return", "value": f"<span style='color:#19d3a2;font-weight:800;'>{pct1(ret)}</span>", "value_px": 16, "wrap": True},
+    ],
+    cols=3,
+)
+
+tile_grid(
+    items=[
+        {"label": "Delta", "value": f"{delta:.2f}", "value_px": 16},
+        {"label": "Keep Probability", "value": f"<span style='color:{keep_color};font-weight:800;'>~{pct0(keep_p)}</span>", "value_px": 16, "wrap": True},
+        {"label": "Annualized Return", "value": f"<span style='color:#19d3a2;font-weight:800;'>{pct1(ann)}</span>", "value_px": 16, "wrap": True},
+    ],
+    cols=3,
+)
+
+st.divider()
+
+# =========================
+# Compare Strikes (Top 5)
+# =========================
+st.subheader("Compare Strikes")
+
+def strike_label_row(k: float, best_k: float) -> str:
+    if not np.isfinite(k):
+        return "—"
+    s = f"${k:,.2f}".rstrip("0").rstrip(".")
+    return f"{s} ✓" if abs(k - best_k) < 1e-12 else s
+
+compare = pd.DataFrame({
+    "Strike": [strike_label_row(k, float(best["K"])) for k in top["K"].values],
+    "Total Premium": [money0(x) for x in top["premium_$"].values],
+    "Return": [pct1(x) for x in top["return_%"].values],
+    "Ann.": [pct1(x) for x in top["ann_%"].values],
+    "Delta": [("" if not np.isfinite(x) else f"{x:.2f}") for x in top["delta"].values],
+    "IV": [pct0(x) for x in top["iv"].values],
+    "Keep %": [pct0(x) for x in top["keep_%"].values],
+})
+
+st.dataframe(compare, use_container_width=True, hide_index=True)
+
+st.caption(
+    "Keep Probability/Keep % is a quick approximation using delta (calls: 1−Δ, puts: 1−|Δ|). "
+    "Deltas are estimated via Black–Scholes using Yahoo IV."
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
