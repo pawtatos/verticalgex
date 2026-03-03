@@ -3,10 +3,52 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import yfinance as yf
+import math
+from dataclasses import dataclass
+from typing import Optional, Tuple, Dict, List
+from plotly.subplots import make_subplots
+
+# Optional: enables hover readout + a simple price ruler line
+try:
+    from streamlit_plotly_events import plotly_events
+except Exception:
+    plotly_events = None
+
+
+# =========================
+# Indicator Settings
+# =========================
+
+EMA_FAST = 20
+EMA_MID = 50
+EMA_SLOW = 200
+
+RSI_LEN = 14
+STOCH_RSI_LEN = 14
+STOCH_RSI_SMOOTH_K = 3
+STOCH_RSI_SMOOTH_D = 3
+
+STOCH_K_SMOOTH = STOCH_RSI_SMOOTH_K
+STOCH_D_SMOOTH = STOCH_RSI_SMOOTH_D
+
+YFINANCE_PERIOD = "2y"
+
+
+st.set_page_config(
+    page_title="Analyzer",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+
+# =========================
+# Quote Helper
+# =========================
 
 @st.cache_data(ttl=30)
-def get_quote(symbol: str) -> dict:
-    symbol = str(symbol).strip().upper()
+def get_quote(symbol: str):
+
+    symbol = symbol.upper()
 
     last = None
     prev = None
@@ -14,26 +56,26 @@ def get_quote(symbol: str) -> dict:
     try:
         t = yf.Ticker(symbol)
         fi = t.fast_info
+
         last = fi.get("last_price")
         prev = fi.get("previous_close")
+
     except:
         pass
 
     if last is None or prev is None:
+
         h = yf.Ticker(symbol).history(period="5d")
+
         if len(h) >= 2:
+
             last = float(h["Close"].iloc[-1])
             prev = float(h["Close"].iloc[-2])
 
     chg = last - prev
     pct = chg / prev
 
-    return {
-        "last": last,
-        "prev": prev,
-        "chg": chg,
-        "pct": pct
-    }
+    return last, chg, pct
 
 import streamlit as st
 
@@ -74,7 +116,7 @@ def top_nav(active: str = "analyzer"):
         unsafe_allow_html=True
     )
 
-    c1, c2, c3, c4, c5 = st.columns([1, 1, 1, 1, 1], gap="small")
+    c1, c2, c3, c4 = st.columns([1, 1, 1, 1], gap="small")
 
     with c1:
         st.markdown('<div class="navbtn {}">'.format("active" if active=="gex" else ""), unsafe_allow_html=True)
@@ -99,13 +141,6 @@ def top_nav(active: str = "analyzer"):
         if st.button("Synthetic Put DCA", use_container_width=True):
             st.switch_page("pages/2_Synthetic_Put_DCA.py")
         st.markdown("</div>", unsafe_allow_html=True)
-
-    with c5:
-        st.markdown('<div class="navbtn {}">'.format("active" if active=="cc" else ""), unsafe_allow_html=True)
-        if st.button("CC / CSP", use_container_width=True):
-            st.switch_page("pages/3_CC_CSP.py")
-        st.markdown("</div>", unsafe_allow_html=True)
-
 
 top_nav(active="analyzer")
 
@@ -1109,14 +1144,26 @@ def scoring_chart(components: List[tuple]) -> go.Figure:
 # =========================
 st.title(f"Daily Technical Dashboard — v{VERSION}")
 
-q = get_quote(ticker)
+# -----------------------
+# Ticker Price Display
+# -----------------------
 
-last = q["last"]
-chg = q["chg"]
-pct = q["pct"]
+last, chg, pct = get_quote(ticker)
 
-color = "#00A000" if chg > 0 else "#D00000"
+color = "#00C853" if chg > 0 else "#FF3D00"
 arrow = "▲" if chg > 0 else "▼"
+
+st.markdown(
+    f"""
+    <div style="font-size:20px;font-weight:700;margin-top:-5px;margin-bottom:10px;">
+        {ticker} ${last:,.2f}
+        <span style="color:{color};margin-left:12px;">
+        {arrow} {chg:+.2f} ({pct:+.2%})
+        </span>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 st.markdown(
     f"""
