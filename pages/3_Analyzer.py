@@ -13,9 +13,13 @@ EMA_SLOW = 200
 
 RSI_LEN = 14
 STOCH_RSI_LEN = 14
+# If you prefer these names:
 STOCH_RSI_SMOOTH_K = 3
 STOCH_RSI_SMOOTH_D = 3
 
+# Aliases to match the function call used later in the file:
+STOCH_K_SMOOTH = STOCH_RSI_SMOOTH_K
+STOCH_D_SMOOTH = STOCH_RSI_SMOOTH_D
 st.set_page_config(
     page_title="Analyzer",
     layout="wide",
