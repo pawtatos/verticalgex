@@ -38,7 +38,7 @@ def top_nav(active: str = "dca"):
         unsafe_allow_html=True
     )
 
-    c1, c2, c3 = st.columns([1, 1, 1], gap="small")
+    c1, c2, c3, c4 c = st.columns([1, 1, 1, 1], gap="small")
 
     with c1:
         st.markdown('<div class="navbtn {}">'.format("active" if active=="gex" else ""), unsafe_allow_html=True)
@@ -57,6 +57,12 @@ def top_nav(active: str = "dca"):
         if st.button("Synthetic Put DCA", use_container_width=True):
             st.switch_page("pages/2_Synthetic_Put_DCA.py")
         st.markdown("</div>", unsafe_allow_html=True)
+        
+    with c4:
+        st.markdown('<div class="navbtn {}">'.format("active" if active=="analyzer" else ""), unsafe_allow_html=True)
+        if st.button("Analyzer", use_container_width=True):
+            st.switch_page("pages/3_Analyzer.py")
+        st.markdown("</div>", unsafe_allow_html=True)  
 
 top_nav(active="dca")
 
