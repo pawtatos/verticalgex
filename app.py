@@ -67,7 +67,7 @@ def top_nav(active: str = "gex"):
             st.switch_page("pages/3_Analyzer.py")
         st.markdown("</div>", unsafe_allow_html=True)  
 
-    st.markdown("</div>", unsafe_allow_html=True
+    st.markdown("</div>", unsafe_allow_html=True)
                 
 # Optional auto-refresh
 try:
@@ -982,6 +982,7 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
 
 
