@@ -967,7 +967,7 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
             dict(
                 type="buttons",
                 direction="left",
-                x=0.00, y=1.12,
+                x=0.00, y=1.22,
                 xanchor="left", yanchor="top",
                 pad=dict(r=6, t=0),
                 bgcolor="rgba(245,245,245,0.95)",
@@ -988,7 +988,7 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
             dict(
                 type="buttons",
                 direction="left",
-                x=0.35, y=1.2,
+                x=0.35, y=1.22,
                 xanchor="left", yanchor="top",
                 pad=dict(r=6, t=0),
                 bgcolor="rgba(245,245,245,0.95)",
