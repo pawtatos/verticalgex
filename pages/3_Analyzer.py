@@ -1,8 +1,12 @@
 import streamlit as st
-import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+
+# Indicator parameters
+EMA_FAST = 20
+EMA_MID = 50
+EMA_SLOW = 200
 
 st.set_page_config(
     page_title="Analyzer",
