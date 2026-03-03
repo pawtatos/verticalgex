@@ -1,44 +1,39 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import yfinance as yf
 
 @st.cache_data(ttl=30)
 def get_quote(symbol: str) -> dict:
-    """Best-effort live-ish quote. Falls back to daily close."""
     symbol = str(symbol).strip().upper()
+
     last = None
     prev = None
+
     try:
         t = yf.Ticker(symbol)
-        fi = getattr(t, "fast_info", None)
-        if fi:
-            last = fi.get("last_price") or fi.get("lastPrice")
-            prev = fi.get("previous_close") or fi.get("previousClose")
-    except Exception:
+        fi = t.fast_info
+        last = fi.get("last_price")
+        prev = fi.get("previous_close")
+    except:
         pass
 
     if last is None or prev is None:
-        try:
-            h = yf.Ticker(symbol).history(period="5d", interval="1d")
-            if h is not None and not h.empty and "Close" in h.columns:
-                closes = h["Close"].dropna().astype(float)
-                if len(closes) >= 1 and last is None:
-                    last = float(closes.iloc[-1])
-                if len(closes) >= 2 and prev is None:
-                    prev = float(closes.iloc[-2])
-        except Exception:
-            pass
+        h = yf.Ticker(symbol).history(period="5d")
+        if len(h) >= 2:
+            last = float(h["Close"].iloc[-1])
+            prev = float(h["Close"].iloc[-2])
 
-    try:
-        last = float(last) if last is not None else float("nan")
-    except Exception:
-        last = float("nan")
-    try:
-        prev = float(prev) if prev is not None else float("nan")
-    except Exception:
-        prev = float("nan")
+    chg = last - prev
+    pct = chg / prev
 
-    chg = last - prev if (np.isfinite(last) and np.isfinite(prev)) else float("nan")
-    pct = (chg / prev) if (np.isfinite(chg) and np.isfinite(prev) and prev != 0) else float("nan")
-    return {"last": last, "prev": prev, "chg": chg, "pct": pct}
-
+    return {
+        "last": last,
+        "prev": prev,
+        "chg": chg,
+        "pct": pct
+    }
 
 import streamlit as st
 
@@ -1067,8 +1062,6 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
 
     return fig
 
-
-
 def scoring_chart(components: List[tuple]) -> go.Figure:
     names = [c[0] for c in components]
     pts = [int(c[1]) for c in components]
@@ -1115,6 +1108,27 @@ def scoring_chart(components: List[tuple]) -> go.Figure:
 # UI
 # =========================
 st.title(f"Daily Technical Dashboard — v{VERSION}")
+
+q = get_quote(ticker)
+
+last = q["last"]
+chg = q["chg"]
+pct = q["pct"]
+
+color = "#00A000" if chg > 0 else "#D00000"
+arrow = "▲" if chg > 0 else "▼"
+
+st.markdown(
+    f"""
+    <div style="margin-top:-8px;margin-bottom:10px;font-size:18px;font-weight:800;">
+        {ticker} ${last:,.2f}
+        <span style="color:{color};margin-left:10px;">
+        {arrow} {chg:+.2f} ({pct:+.2%})
+        </span>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 c1, c2 = st.columns([1.25, 0.75])
 with c1:
