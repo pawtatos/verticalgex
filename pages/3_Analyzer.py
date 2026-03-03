@@ -1111,7 +1111,24 @@ st.title(f"Daily Technical Dashboard — v{VERSION}")
 
 c1, c2 = st.columns([1.25, 0.75])
 with c1:
-    ticker = st.text_input("Ticker (press Enter)", value="SPY").strip().upper()
+    ticker = st.text_input("Enter Ticker", value="SPY").strip().upper()
+# Get current price
+try:
+    ticker_data = yf.Ticker(ticker)
+    price = ticker_data.fast_info["last_price"]
+except Exception:
+    price = None
+
+# Display under title
+if price:
+    st.markdown(
+        f"""
+        <div style="font-size:18px; font-weight:600; margin-bottom:10px;">
+        {ticker} — ${price:,.2f}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 with c2:
     st.empty()
 
