@@ -1,36 +1,46 @@
+
+@st.cache_data(ttl=30)
+def get_quote(symbol: str) -> dict:
+    """Best-effort live-ish quote. Falls back to daily close."""
+    symbol = str(symbol).strip().upper()
+    last = None
+    prev = None
+    try:
+        t = yf.Ticker(symbol)
+        fi = getattr(t, "fast_info", None)
+        if fi:
+            last = fi.get("last_price") or fi.get("lastPrice")
+            prev = fi.get("previous_close") or fi.get("previousClose")
+    except Exception:
+        pass
+
+    if last is None or prev is None:
+        try:
+            h = yf.Ticker(symbol).history(period="5d", interval="1d")
+            if h is not None and not h.empty and "Close" in h.columns:
+                closes = h["Close"].dropna().astype(float)
+                if len(closes) >= 1 and last is None:
+                    last = float(closes.iloc[-1])
+                if len(closes) >= 2 and prev is None:
+                    prev = float(closes.iloc[-2])
+        except Exception:
+            pass
+
+    try:
+        last = float(last) if last is not None else float("nan")
+    except Exception:
+        last = float("nan")
+    try:
+        prev = float(prev) if prev is not None else float("nan")
+    except Exception:
+        prev = float("nan")
+
+    chg = last - prev if (np.isfinite(last) and np.isfinite(prev)) else float("nan")
+    pct = (chg / prev) if (np.isfinite(chg) and np.isfinite(prev) and prev != 0) else float("nan")
+    return {"last": last, "prev": prev, "chg": chg, "pct": pct}
+
+
 import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-import yfinance as yf
-import math
-from dataclasses import dataclass
-from typing import Optional, Tuple, Dict, List
-
-from plotly.subplots import make_subplots
-
-# Optional: enables hover readout + a simple price ruler line
-try:
-    from streamlit_plotly_events import plotly_events  # pip install streamlit-plotly-events
-except Exception:
-    plotly_events = None
-
-# =========================
-# Indicator Settings
-# =========================
-EMA_FAST = 20
-EMA_MID = 50
-EMA_SLOW = 200
-
-RSI_LEN = 14
-STOCH_RSI_LEN = 14
-STOCH_RSI_SMOOTH_K = 3
-STOCH_RSI_SMOOTH_D = 3
-STOCH_K_SMOOTH = STOCH_RSI_SMOOTH_K
-STOCH_D_SMOOTH = STOCH_RSI_SMOOTH_D
-
-# yfinance lookback window for daily candles used by the analyzer
-YFINANCE_PERIOD = "2y"
 
 st.set_page_config(
     page_title="Analyzer",
@@ -45,6 +55,7 @@ st.markdown("""
   [data-testid="collapsedControl"] { display: none; }
 </style>
 """, unsafe_allow_html=True)
+
 
 def top_nav(active: str = "analyzer"):
     st.markdown(
@@ -68,31 +79,38 @@ def top_nav(active: str = "analyzer"):
         unsafe_allow_html=True
     )
 
-    c1, c2, c3, c4 = st.columns([1, 1, 1, 1], gap="small")
+    c1, c2, c3, c4, c5 = st.columns([1, 1, 1, 1, 1], gap="small")
 
     with c1:
-        st.markdown('<div class="navbtn %s">' % ("active" if active=="gex" else ""), unsafe_allow_html=True)
+        st.markdown('<div class="navbtn {}">'.format("active" if active=="gex" else ""), unsafe_allow_html=True)
         if st.button("GEX", use_container_width=True):
             st.switch_page("app.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c2:
-        st.markdown('<div class="navbtn %s">' % ("active" if active=="lev" else ""), unsafe_allow_html=True)
+        st.markdown('<div class="navbtn {}">'.format("active" if active=="lev" else ""), unsafe_allow_html=True)
         if st.button("Leveraged Converter", use_container_width=True):
             st.switch_page("pages/1_Leverage_Equivalence.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c3:
-        st.markdown('<div class="navbtn %s">' % ("active" if active=="dca" else ""), unsafe_allow_html=True)
+        st.markdown('<div class="navbtn {}">'.format("active" if active=="analyzer" else ""), unsafe_allow_html=True)
+        if st.button("Analyzer", use_container_width=True):
+            st.switch_page("pages/3_Analyzer.py")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with c4:
+        st.markdown('<div class="navbtn {}">'.format("active" if active=="dca" else ""), unsafe_allow_html=True)
         if st.button("Synthetic Put DCA", use_container_width=True):
             st.switch_page("pages/2_Synthetic_Put_DCA.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    with c4:
-        st.markdown('<div class="navbtn %s">' % ("active" if active=="analyzer" else ""), unsafe_allow_html=True)
-        if st.button("Analyzer", use_container_width=True):
-            st.switch_page("pages/3_Analyzer.py")
+    with c5:
+        st.markdown('<div class="navbtn {}">'.format("active" if active=="cc" else ""), unsafe_allow_html=True)
+        if st.button("CC / CSP", use_container_width=True):
+            st.switch_page("pages/3_CC_CSP.py")
         st.markdown("</div>", unsafe_allow_html=True)
+
 
 top_nav(active="analyzer")
 
@@ -117,41 +135,30 @@ top_nav(active="analyzer")
 # Run:
 #   streamlit run appv56.py
 
+import math
+from dataclasses import dataclass
+from typing import Optional, Tuple, Dict, List
+
+import numpy as np
+import pandas as pd
+import streamlit as st
+import yfinance as yf
+import plotly.graph_objects as go
+
+# Optional: enables hover readout + a simple price ruler line
+try:
+    from streamlit_plotly_events import plotly_events  # pip install streamlit-plotly-events
+except Exception:
+    plotly_events = None
+
+from plotly.subplots import make_subplots
 
 
 # =========================
 # Config
 # =========================
-VERSION = 56
+VERSION = 57
 
-
-EMA_FAST = 20
-EMA_MID = 50
-EMA_SLOW = 200
-
-RSI_LEN = 14
-
-# Stoch RSI
-STOCH_RSI_LEN = 14
-STOCH_K_SMOOTH = 3
-STOCH_D_SMOOTH = 3
-
-PIVOT_LEFT = 15
-PIVOT_RIGHT = 15
-
-YFINANCE_PERIOD = "5y"
-
-# TV-ish candle colors
-BULL_FILL = "#22c55e"
-BEAR_FILL = "#ef4444"
-BULL_LINE = "#16a34a"
-BEAR_LINE = "#dc2626"
-
-DEFAULT_BARS = 60  # visible price window used for y-range padding
-
-
-# =========================
-# Snapshot tiles (styled like your reference)
 # =========================
 def snap_cell(label: str, value: str, label_px: int = 10, value_px: int = 16, wrap_value: bool = False) -> str:
     white_space = "normal" if wrap_value else "nowrap"
@@ -967,7 +974,7 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
             dict(
                 type="buttons",
                 direction="left",
-                x=0.00, y=1.25,
+                x=0.0, y=1.12,
                 xanchor="left", yanchor="top",
                 pad=dict(r=6, t=0),
                 bgcolor="rgba(245,245,245,0.95)",
@@ -988,7 +995,7 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
             dict(
                 type="buttons",
                 direction="left",
-                x=0.35, y=1.25,
+                x=0.23, y=1.12,
                 xanchor="left", yanchor="top",
                 pad=dict(r=6, t=0),
                 bgcolor="rgba(245,245,245,0.95)",
@@ -1111,24 +1118,7 @@ st.title(f"Daily Technical Dashboard — v{VERSION}")
 
 c1, c2 = st.columns([1.25, 0.75])
 with c1:
-    ticker = st.text_input("Enter Ticker", value="SPY").strip().upper()
-# Get current price
-try:
-    ticker_data = yf.Ticker(ticker)
-    price = ticker_data.fast_info["last_price"]
-except Exception:
-    price = None
-
-# Display under title
-if price:
-    st.markdown(
-        f"""
-        <div style="font-size:18px; font-weight:600; margin-bottom:10px;">
-        {ticker} — ${price:,.2f}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    ticker = st.text_input("Ticker (press Enter)", value="SPY").strip().upper()
 with c2:
     st.empty()
 
@@ -1141,6 +1131,32 @@ except Exception as e:
 if df.empty:
     st.error("No data returned for this ticker.")
     st.stop()
+
+
+# Ticker + price line (under the title)
+q = get_quote(ticker)
+last = q.get("last", float("nan"))
+prev = q.get("prev", float("nan"))
+chg = q.get("chg", float("nan"))
+pct = q.get("pct", float("nan"))
+
+if np.isfinite(last):
+    up = np.isfinite(chg) and chg > 0
+    down = np.isfinite(chg) and chg < 0
+    color = "#00A000" if up else ("#D00000" if down else "#cfcfcf")
+    arrow = "▲" if up else ("▼" if down else "")
+    chg_txt = f"{chg:+.2f}" if np.isfinite(chg) else "—"
+    pct_txt = f"({pct:+.2%})" if np.isfinite(pct) else ""
+    st.markdown(
+        f"""
+        <div style="margin-top:-6px;margin-bottom:10px;font-size:18px;font-weight:800;color:#e6e6e6;">
+          {ticker} <span style="font-weight:900;">${last:,.2f}</span>
+          <span style="margin-left:10px;color:{color};font-weight:900;">{arrow} {chg_txt} {pct_txt}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 
 # Indicators (regular price)
 df["EMA20"] = tv_ema(df["Close"], EMA_FAST)
