@@ -6,8 +6,9 @@ altair>=5.0,<6
 yfinance>=0.2.40
 requests>=2.31
 streamlit-javascript>=0.1.5
-plotly==1.37.1
+plotly==5.22.0
 ta
+
 
 
 
