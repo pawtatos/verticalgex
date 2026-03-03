@@ -38,7 +38,7 @@ def top_nav(active: str = "dca"):
         unsafe_allow_html=True
     )
 
-    c1, c2, c3, c4 c = st.columns([1, 1, 1, 1], gap="small")
+    c1, c2, c3, c4 = st.columns([1, 1, 1, 1], gap="small")
 
     with c1:
         st.markdown('<div class="navbtn {}">'.format("active" if active=="gex" else ""), unsafe_allow_html=True)
