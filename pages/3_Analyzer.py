@@ -2,24 +2,36 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import yfinance as yf
+import math
+from dataclasses import dataclass
+from typing import Optional, Tuple, Dict, List
+
+from plotly.subplots import make_subplots
+
+# Optional: enables hover readout + a simple price ruler line
+try:
+    from streamlit_plotly_events import plotly_events  # pip install streamlit-plotly-events
+except Exception:
+    plotly_events = None
 
 # =========================
 # Indicator Settings
 # =========================
-
 EMA_FAST = 20
 EMA_MID = 50
 EMA_SLOW = 200
 
 RSI_LEN = 14
 STOCH_RSI_LEN = 14
-# If you prefer these names:
 STOCH_RSI_SMOOTH_K = 3
 STOCH_RSI_SMOOTH_D = 3
-
-# Aliases to match the function call used later in the file:
 STOCH_K_SMOOTH = STOCH_RSI_SMOOTH_K
 STOCH_D_SMOOTH = STOCH_RSI_SMOOTH_D
+
+# yfinance lookback window for daily candles used by the analyzer
+YFINANCE_PERIOD = "2y"
+
 st.set_page_config(
     page_title="Analyzer",
     layout="wide",
@@ -33,7 +45,6 @@ st.markdown("""
   [data-testid="collapsedControl"] { display: none; }
 </style>
 """, unsafe_allow_html=True)
-
 
 def top_nav(active: str = "analyzer"):
     st.markdown(
@@ -60,29 +71,28 @@ def top_nav(active: str = "analyzer"):
     c1, c2, c3, c4 = st.columns([1, 1, 1, 1], gap="small")
 
     with c1:
-        st.markdown('<div class="navbtn {}">'.format("active" if active=="gex" else ""), unsafe_allow_html=True)
+        st.markdown('<div class="navbtn %s">' % ("active" if active=="gex" else ""), unsafe_allow_html=True)
         if st.button("GEX", use_container_width=True):
             st.switch_page("app.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c2:
-        st.markdown('<div class="navbtn {}">'.format("active" if active=="lev" else ""), unsafe_allow_html=True)
+        st.markdown('<div class="navbtn %s">' % ("active" if active=="lev" else ""), unsafe_allow_html=True)
         if st.button("Leveraged Converter", use_container_width=True):
             st.switch_page("pages/1_Leverage_Equivalence.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c3:
-        st.markdown('<div class="navbtn {}">'.format("active" if active=="dca" else ""), unsafe_allow_html=True)
+        st.markdown('<div class="navbtn %s">' % ("active" if active=="dca" else ""), unsafe_allow_html=True)
         if st.button("Synthetic Put DCA", use_container_width=True):
             st.switch_page("pages/2_Synthetic_Put_DCA.py")
         st.markdown("</div>", unsafe_allow_html=True)
-    
+
     with c4:
-        st.markdown('<div class="navbtn {}">'.format("active" if active=="analyzer" else ""), unsafe_allow_html=True)
+        st.markdown('<div class="navbtn %s">' % ("active" if active=="analyzer" else ""), unsafe_allow_html=True)
         if st.button("Analyzer", use_container_width=True):
             st.switch_page("pages/3_Analyzer.py")
-        st.markdown("</div>", unsafe_allow_html=True)    
-        
+        st.markdown("</div>", unsafe_allow_html=True)
 
 top_nav(active="analyzer")
 
@@ -107,23 +117,6 @@ top_nav(active="analyzer")
 # Run:
 #   streamlit run appv56.py
 
-import math
-from dataclasses import dataclass
-from typing import Optional, Tuple, Dict, List
-
-import numpy as np
-import pandas as pd
-import streamlit as st
-import yfinance as yf
-import plotly.graph_objects as go
-
-# Optional: enables hover readout + a simple price ruler line
-try:
-    from streamlit_plotly_events import plotly_events  # pip install streamlit-plotly-events
-except Exception:
-    plotly_events = None
-
-from plotly.subplots import make_subplots
 
 
 # =========================
@@ -131,6 +124,34 @@ from plotly.subplots import make_subplots
 # =========================
 VERSION = 56
 
+
+EMA_FAST = 20
+EMA_MID = 50
+EMA_SLOW = 200
+
+RSI_LEN = 14
+
+# Stoch RSI
+STOCH_RSI_LEN = 14
+STOCH_K_SMOOTH = 3
+STOCH_D_SMOOTH = 3
+
+PIVOT_LEFT = 15
+PIVOT_RIGHT = 15
+
+YFINANCE_PERIOD = "5y"
+
+# TV-ish candle colors
+BULL_FILL = "#22c55e"
+BEAR_FILL = "#ef4444"
+BULL_LINE = "#16a34a"
+BEAR_LINE = "#dc2626"
+
+DEFAULT_BARS = 60  # visible price window used for y-range padding
+
+
+# =========================
+# Snapshot tiles (styled like your reference)
 # =========================
 def snap_cell(label: str, value: str, label_px: int = 10, value_px: int = 16, wrap_value: bool = False) -> str:
     white_space = "normal" if wrap_value else "nowrap"
@@ -707,9 +728,6 @@ def build_verdict(
 # =========================
 # Data
 # =========================
-
-YFINANCE_PERIOD = "2y" 
-
 @st.cache_data(show_spinner=False)
 def load_daily(ticker: str) -> pd.DataFrame:
     df = yf.download(
