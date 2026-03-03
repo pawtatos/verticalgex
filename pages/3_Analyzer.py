@@ -691,6 +691,9 @@ def build_verdict(
 # =========================
 # Data
 # =========================
+
+YFINANCE_PERIOD = "2y" 
+
 @st.cache_data(show_spinner=False)
 def load_daily(ticker: str) -> pd.DataFrame:
     df = yf.download(
