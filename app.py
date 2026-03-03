@@ -41,30 +41,32 @@ def top_nav(active: str = "gex"):
         unsafe_allow_html=True
     )
 
-    st.markdown('<div class="navwrap">', unsafe_allow_html=True)
-
-    c1, c2, c3 = st.columns([1, 1, 1], gap="small")
+    c1, c2, c3, c4 c = st.columns([1, 1, 1, 1], gap="small")
 
     with c1:
         st.markdown('<div class="navbtn {}">'.format("active" if active=="gex" else ""), unsafe_allow_html=True)
-        if st.button("GEX", use_container_width=True, key="nav_gex"):
+        if st.button("GEX", use_container_width=True):
             st.switch_page("app.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c2:
         st.markdown('<div class="navbtn {}">'.format("active" if active=="lev" else ""), unsafe_allow_html=True)
-        if st.button("Leveraged Converter", use_container_width=True, key="nav_lev"):
+        if st.button("Leveraged Converter", use_container_width=True):
             st.switch_page("pages/1_Leverage_Equivalence.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c3:
         st.markdown('<div class="navbtn {}">'.format("active" if active=="dca" else ""), unsafe_allow_html=True)
-        if st.button("Synthetic Put DCA", use_container_width=True, key="nav_dca"):
+        if st.button("Synthetic Put DCA", use_container_width=True):
             st.switch_page("pages/2_Synthetic_Put_DCA.py")
         st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
+        
+    with c4:
+        st.markdown('<div class="navbtn {}">'.format("active" if active=="analyzer" else ""), unsafe_allow_html=True)
+        if st.button("Analyzer", use_container_width=True):
+            st.switch_page("pages/3_Analyzer.py")
+        st.markdown("</div>", unsafe_allow_html=True)  
+        
 # Optional auto-refresh
 try:
     from streamlit_autorefresh import st_autorefresh
@@ -978,6 +980,7 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
 
 
