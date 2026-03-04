@@ -1156,7 +1156,6 @@ with c2:
         "",
         value="HOOD",
         label_visibility="collapsed"
-        max_chars=10
     )
 
 # Ticker + current price (under the title)
