@@ -1146,7 +1146,7 @@ def scoring_chart(components: List[tuple]) -> go.Figure:
 # =========================
 st.title(f"Daily Technical Dashboard — v{VERSION}")
 
-c1, c2, c3 = st.columns([1,2,5])
+c1, c2, _ = st.columns([1,2,6])
 
 with c1:
     st.markdown("**Ticker:**")
@@ -1156,6 +1156,7 @@ with c2:
         "",
         value="HOOD",
         label_visibility="collapsed"
+        max_chars=10
     )
 
 # Ticker + current price (under the title)
