@@ -907,7 +907,7 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
     # Guide lines
     guide_shapes = [
         dict(type="line", xref="paper", yref="y3", x0=0, x1=1, y0=50, y1=50,
-             line=dict(color="rgba(40,40,40,0.65)", width=1.2, dash="dot")),
+             line=dict(color="rgba(255,255,255,0.45)", width=1.2, dash="dot")),
         dict(type="line", xref="paper", yref="y3", x0=0, x1=1, y0=70, y1=70,
              line=dict(color="rgba(0,153,255,0.45)", width=1.1, dash="dot")),
         dict(type="line", xref="paper", yref="y3", x0=0, x1=1, y0=30, y1=30,
