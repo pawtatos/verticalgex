@@ -1229,7 +1229,7 @@ verdict = build_verdict(
 left, right = st.columns([1.55, 1.05])
 
 with left:
-    st.subheader("")
+    # st.subheader("")
 
     ruler_y = st.session_state.get("ruler_y")
     fig = make_chart(df, ruler_y=ruler_y)
