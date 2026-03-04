@@ -1155,6 +1155,7 @@ with c2:
     ticker = st.text_input(
         "",
         value="HOOD",
+        placeholder="Enter Ticker"),
         label_visibility="collapsed"
     )
 
