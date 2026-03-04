@@ -50,7 +50,7 @@ st.markdown("""
 <style>
 /* move plotly toolbar down */
 .js-plotly-plot .modebar {
-    top: 40px !important;
+    top: 30px !important;
 }
 </style>
 """, unsafe_allow_html=True)
