@@ -1146,7 +1146,7 @@ def scoring_chart(components: List[tuple]) -> go.Figure:
 # =========================
 st.title(f"Daily Technical Dashboard — v{VERSION}")
 
-c1, c2, _ = st.columns([1,2,20])
+c1, c2, _ = st.columns([1,2,24])
 
 with c1:
     st.markdown("**Ticker:**")
