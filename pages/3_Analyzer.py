@@ -38,6 +38,9 @@ BEAR_LINE = "#FF3D00"
 BULL_FILL = "rgba(0, 200, 83, 0.35)"
 BEAR_FILL = "rgba(255, 61, 0, 0.35)"
 
+
+# Default number of bars to show initially
+DEFAULT_BARS = 220
 st.set_page_config(
     page_title="Analyzer",
     layout="wide",
