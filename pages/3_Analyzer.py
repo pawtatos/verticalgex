@@ -826,19 +826,6 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
         ),
         row=1, col=1
     )
-    # Invisible helper trace so hover always returns a single "price" (Close) per bar
-    fig.add_trace(
-        go.Scatter(
-            x=raw_df.index,
-            y=raw_df["Close"],
-            name="HoverClose",
-            mode="markers",
-            marker=dict(size=10, opacity=0.0),
-            hovertemplate="Price: %{y:.2f}<extra></extra>",
-            showlegend=False,
-        ),
-        row=1, col=1
-    )
     fig.add_trace(
         go.Candlestick(
             x=ha_df.index,
@@ -972,6 +959,11 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
                 font=dict(size=12, color="white")
             ))
 
+    n_traces = len(fig.data)
+    # Toggle only the candle traces (keep EMAs/levels/volume/oscillator visible)
+    vis_regular = [True, True, False] + [True] * max(0, n_traces - 3)
+    vis_heikin  = [False, True, True] + [True] * max(0, n_traces - 3)
+
     fig.update_layout(
         template="plotly_white",
         height=960,
@@ -1020,8 +1012,8 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
                 font=dict(size=12, color="black"),
                 active=0,
                 buttons=[
-                    dict(label="Regular", method="update", args=[{"visible": [True, False, True, True, True, True, True, True, True]}]),
-                    dict(label="Heikin Ashi", method="update", args=[{"visible": [False, True, True, True, True, True, True, True, True]}]),
+                    dict(label="Regular", method="update", args=[{"visible": vis_regular}]),
+                    dict(label="Heikin Ashi", method="update", args=[{"visible": vis_heikin}]),
                 ],
             ),
         ],
