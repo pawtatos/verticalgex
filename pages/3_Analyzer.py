@@ -100,15 +100,15 @@ def top_nav(active: str = "analyzer"):
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c3:
-        st.markdown('<div class="navbtn %s">' % ("active" if active=="dca" else ""), unsafe_allow_html=True)
-        if st.button("Synthetic Put DCA", use_container_width=True):
-            st.switch_page("pages/2_Synthetic_Put_DCA.py")
-        st.markdown("</div>", unsafe_allow_html=True    
-                    
-    with c4:
         st.markdown('<div class="navbtn %s">' % ("active" if active=="analyzer" else ""), unsafe_allow_html=True)
         if st.button("Analyzer", use_container_width=True):
             st.switch_page("pages/3_Analyzer.py")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with c4:
+        st.markdown('<div class="navbtn %s">' % ("active" if active=="dca" else ""), unsafe_allow_html=True)
+        if st.button("Synthetic Put DCA", use_container_width=True):
+            st.switch_page("pages/2_Synthetic_Put_DCA.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
 top_nav(active="analyzer")
