@@ -1155,9 +1155,9 @@ with c2:
     ticker = st.text_input(
         "",
         value="HOOD",
-        placeholder="Enter Ticker"),
-        label_visibility="collapsed"
-    )
+        placeholder="Enter ticker",
+        label_visibility="collapsed",
+    ).strip().upper()
 
 # Ticker + current price (under the title)
 last_q, chg_q, pct_q = get_quote(ticker)
