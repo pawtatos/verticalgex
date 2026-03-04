@@ -1159,25 +1159,25 @@ if np.isfinite(last_q):
     arrow = "▲" if (np.isfinite(chg_q) and chg_q > 0) else ("▼" if (np.isfinite(chg_q) and chg_q < 0) else "")
 
     st.markdown(
-        f"""
+    f"""
+    <div style="display:flex; justify-content:center; margin-bottom:10px;">
         <div style="
-            display:inline-block;
-            padding:10px 16px;
+            padding:10px 18px;
             border-radius:12px;
             background:rgba(255,255,255,0.05);
             border:1px solid rgba(255,255,255,0.12);
             font-size:20px;
             font-weight:800;
-            margin-bottom:10px;
         ">
-            {ticker} <span style="font-weight:900;">${last_q:,.2f}</span>
-            <span style="color:{color}; margin-left:10px; font-weight:900;">
+            {ticker} ${last_q:,.2f}
+            <span style="color:{color}; margin-left:10px;">
                 {arrow} {chg_q:+.2f} ({pct_q:+.2%})
             </span>
         </div>
-        """,
-        unsafe_allow_html=True
-    )
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 try:
     df = load_daily(ticker)
