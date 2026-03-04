@@ -1148,7 +1148,7 @@ st.title(f"Daily Technical Dashboard — v{VERSION}")
 
 c1, c2, c3 = st.columns([1,2,1])
 
-with c2:
+with c1:
     ticker = st.text_input(
         "Ticker (press Enter)",
         value="SPY"
