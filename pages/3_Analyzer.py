@@ -1149,7 +1149,7 @@ st.title(f"Daily Technical Dashboard — v{VERSION}")
 c1, c2, _ = st.columns([1, 2, 28])
 
 with c1:
-    st.markdown("**Ticker:**")
+    st.markdown("<div style='padding-top:6px; font-weight:600;'>Ticker:</div>", unsafe_allow_html=True)
 
 with c2:
     ticker = st.text_input(
