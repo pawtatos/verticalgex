@@ -10,15 +10,13 @@ from plotly.subplots import make_subplots
 
 # Optional: enables hover readout + a simple price ruler line
 try:
-    from streamlit_plotly_events import plotly_events
+    from streamlit_plotly_events import plotly_events  # pip install streamlit-plotly-events
 except Exception:
     plotly_events = None
-
 
 # =========================
 # Indicator Settings
 # =========================
-
 EMA_FAST = 20
 EMA_MID = 50
 EMA_SLOW = 200
@@ -27,57 +25,10 @@ RSI_LEN = 14
 STOCH_RSI_LEN = 14
 STOCH_RSI_SMOOTH_K = 3
 STOCH_RSI_SMOOTH_D = 3
-
 STOCH_K_SMOOTH = STOCH_RSI_SMOOTH_K
 STOCH_D_SMOOTH = STOCH_RSI_SMOOTH_D
 
 YFINANCE_PERIOD = "2y"
-
-
-st.set_page_config(
-    page_title="Analyzer",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
-
-
-# =========================
-# Quote Helper
-# =========================
-
-@st.cache_data(ttl=30)
-def get_quote(symbol: str):
-
-    symbol = symbol.upper()
-
-    last = None
-    prev = None
-
-    try:
-        t = yf.Ticker(symbol)
-        fi = t.fast_info
-
-        last = fi.get("last_price")
-        prev = fi.get("previous_close")
-
-    except:
-        pass
-
-    if last is None or prev is None:
-
-        h = yf.Ticker(symbol).history(period="5d")
-
-        if len(h) >= 2:
-
-            last = float(h["Close"].iloc[-1])
-            prev = float(h["Close"].iloc[-2])
-
-    chg = last - prev
-    pct = chg / prev
-
-    return last, chg, pct
-
-import streamlit as st
 
 st.set_page_config(
     page_title="Analyzer",
@@ -92,7 +43,6 @@ st.markdown("""
   [data-testid="collapsedControl"] { display: none; }
 </style>
 """, unsafe_allow_html=True)
-
 
 def top_nav(active: str = "analyzer"):
     st.markdown(
@@ -119,30 +69,71 @@ def top_nav(active: str = "analyzer"):
     c1, c2, c3, c4 = st.columns([1, 1, 1, 1], gap="small")
 
     with c1:
-        st.markdown('<div class="navbtn {}">'.format("active" if active=="gex" else ""), unsafe_allow_html=True)
+        st.markdown('<div class="navbtn %s">' % ("active" if active=="gex" else ""), unsafe_allow_html=True)
         if st.button("GEX", use_container_width=True):
             st.switch_page("app.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c2:
-        st.markdown('<div class="navbtn {}">'.format("active" if active=="lev" else ""), unsafe_allow_html=True)
+        st.markdown('<div class="navbtn %s">' % ("active" if active=="lev" else ""), unsafe_allow_html=True)
         if st.button("Leveraged Converter", use_container_width=True):
             st.switch_page("pages/1_Leverage_Equivalence.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c3:
-        st.markdown('<div class="navbtn {}">'.format("active" if active=="analyzer" else ""), unsafe_allow_html=True)
+        st.markdown('<div class="navbtn %s">' % ("active" if active=="analyzer" else ""), unsafe_allow_html=True)
         if st.button("Analyzer", use_container_width=True):
             st.switch_page("pages/3_Analyzer.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c4:
-        st.markdown('<div class="navbtn {}">'.format("active" if active=="dca" else ""), unsafe_allow_html=True)
+        st.markdown('<div class="navbtn %s">' % ("active" if active=="dca" else ""), unsafe_allow_html=True)
         if st.button("Synthetic Put DCA", use_container_width=True):
             st.switch_page("pages/2_Synthetic_Put_DCA.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
 top_nav(active="analyzer")
+
+@st.cache_data(ttl=30)
+def get_quote(symbol: str):
+    symbol = str(symbol).strip().upper()
+    last = None
+    prev = None
+    try:
+        t = yf.Ticker(symbol)
+        fi = getattr(t, "fast_info", None)
+        if fi:
+            last = fi.get("last_price") or fi.get("lastPrice")
+            prev = fi.get("previous_close") or fi.get("previousClose")
+    except Exception:
+        pass
+
+    if last is None or prev is None:
+        try:
+            h = yf.Ticker(symbol).history(period="5d", interval="1d")
+            if h is not None and not h.empty and "Close" in h.columns:
+                closes = h["Close"].dropna().astype(float)
+                if len(closes) >= 1 and last is None:
+                    last = float(closes.iloc[-1])
+                if len(closes) >= 2 and prev is None:
+                    prev = float(closes.iloc[-2])
+        except Exception:
+            pass
+
+    try:
+        last = float(last) if last is not None else float("nan")
+    except Exception:
+        last = float("nan")
+    try:
+        prev = float(prev) if prev is not None else float("nan")
+    except Exception:
+        prev = float("nan")
+
+    chg = last - prev if (np.isfinite(last) and np.isfinite(prev)) else float("nan")
+    pct = (chg / prev) if (np.isfinite(chg) and np.isfinite(prev) and prev != 0) else float("nan")
+    return last, chg, pct
+
+
 
 # appv56.py
 # Daily Technical Dashboard (TV-style) — Plotly + reliable, explainable analysis
@@ -165,23 +156,7 @@ top_nav(active="analyzer")
 # Run:
 #   streamlit run appv56.py
 
-import math
-from dataclasses import dataclass
-from typing import Optional, Tuple, Dict, List
 
-import numpy as np
-import pandas as pd
-import streamlit as st
-import yfinance as yf
-import plotly.graph_objects as go
-
-# Optional: enables hover readout + a simple price ruler line
-try:
-    from streamlit_plotly_events import plotly_events  # pip install streamlit-plotly-events
-except Exception:
-    plotly_events = None
-
-from plotly.subplots import make_subplots
 
 
 # =========================
@@ -1144,44 +1119,26 @@ def scoring_chart(components: List[tuple]) -> go.Figure:
 # =========================
 st.title(f"Daily Technical Dashboard — v{VERSION}")
 
-# -----------------------
-# Ticker Price Display
-# -----------------------
-
-last, chg, pct = get_quote(ticker)
-
-color = "#00C853" if chg > 0 else "#FF3D00"
-arrow = "▲" if chg > 0 else "▼"
-
-st.markdown(
-    f"""
-    <div style="font-size:20px;font-weight:700;margin-top:-5px;margin-bottom:10px;">
-        {ticker} ${last:,.2f}
-        <span style="color:{color};margin-left:12px;">
-        {arrow} {chg:+.2f} ({pct:+.2%})
-        </span>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    f"""
-    <div style="margin-top:-8px;margin-bottom:10px;font-size:18px;font-weight:800;">
-        {ticker} ${last:,.2f}
-        <span style="color:{color};margin-left:10px;">
-        {arrow} {chg:+.2f} ({pct:+.2%})
-        </span>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
 c1, c2 = st.columns([1.25, 0.75])
 with c1:
     ticker = st.text_input("Ticker (press Enter)", value="SPY").strip().upper()
 with c2:
     st.empty()
+
+# Ticker + current price (under the title)
+last_q, chg_q, pct_q = get_quote(ticker)
+if np.isfinite(last_q):
+    color = "#00C853" if (np.isfinite(chg_q) and chg_q > 0) else ("#FF3D00" if (np.isfinite(chg_q) and chg_q < 0) else "#cfcfcf")
+    arrow = "▲" if (np.isfinite(chg_q) and chg_q > 0) else ("▼" if (np.isfinite(chg_q) and chg_q < 0) else "")
+    st.markdown(
+        f"""
+        <div style=\"font-size:20px;font-weight:800;margin-top:-6px;margin-bottom:10px;\">
+            {ticker} <span style=\"font-weight:900;\">${last_q:,.2f}</span>
+            <span style=\"color:{color};margin-left:12px;font-weight:900;\">{arrow} {chg_q:+.2f} ({pct_q:+.2%})</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 try:
     df = load_daily(ticker)
@@ -1268,12 +1225,10 @@ left, right = st.columns([1.55, 1.05])
 
 with left:
     st.subheader("Chart")
-    fig = make_chart(df)
-        # Hover-driven "price ruler" (TradingView-ish): shows a horizontal dotted line at the hovered bar close.
-    # Limitation: Streamlit+Plotly cannot read arbitrary mouse Y without a custom frontend component,
-    # so the ruler snaps to the hovered bar's Close (still very useful for quick alignment).
+
     ruler_y = st.session_state.get("ruler_y")
     fig = make_chart(df, ruler_y=ruler_y)
+
     if plotly_events is None:
         st.plotly_chart(
             fig,
@@ -1296,12 +1251,19 @@ with left:
                     st.session_state["ruler_y"] = float(hy)
                 except Exception:
                     pass
-        # Small readout under the chart
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True,
+            config={"scrollZoom": True, "displayModeBar": True, "displaylogo": False},
+        )
+
         if st.session_state.get("ruler_y") is not None:
             st.markdown(
                 f"<div style=\"margin-top:6px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);font-weight:900;display:inline-block;\">Ruler price (hover close): {st.session_state['ruler_y']:,.2f}</div>",
                 unsafe_allow_html=True,
             )
+
 with right:
     st.subheader("Snapshot")
 
