@@ -1160,20 +1160,23 @@ if np.isfinite(last_q):
 
     st.markdown(
     f"""
-    <div style="display:flex; justify-content:center; margin-bottom:10px;">
-        <div style="
-            padding:10px 18px;
-            border-radius:12px;
-            background:rgba(255,255,255,0.05);
-            border:1px solid rgba(255,255,255,0.12);
-            font-size:20px;
-            font-weight:800;
-        ">
-            {ticker} ${last_q:,.2f}
-            <span style="color:{color}; margin-left:10px;">
-                {arrow} {chg_q:+.2f} ({pct_q:+.2%})
-            </span>
-        </div>
+    <div style="max-width:1200px; margin: 0 auto 10px auto;">
+      <div style="
+          width: fit-content;
+          margin: 0 auto;
+          padding: 8px 14px;
+          border-radius: 12px;
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.12);
+          font-size: 18px;
+          font-weight: 600;   /* less thick */
+          letter-spacing: 0.2px;
+      ">
+        {ticker} ${last_q:,.2f}
+        <span style="color:{color}; margin-left:10px; font-weight:600;">
+          {arrow} {chg_q:+.2f} ({pct_q:+.2%})
+        </span>
+      </div>
     </div>
     """,
     unsafe_allow_html=True
