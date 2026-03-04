@@ -46,6 +46,14 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+st.markdown("""
+<style>
+/* move plotly toolbar down */
+.js-plotly-plot .modebar {
+    top: 40px !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.markdown("""
 <style>
