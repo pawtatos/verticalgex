@@ -961,7 +961,7 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
 
     n_traces = len(fig.data)
     # Toggle only the candle traces (keep EMAs/levels/volume/oscillator visible)
-    vis_regular = [True, True, False] + [True] * max(0, n_traces - 3)
+    vis_regular = [True, False, True] + [True] * max(0, n_traces - 3)
     vis_heikin  = [False, True, True] + [True] * max(0, n_traces - 3)
 
     fig.update_layout(
