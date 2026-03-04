@@ -1146,11 +1146,13 @@ def scoring_chart(components: List[tuple]) -> go.Figure:
 # =========================
 st.title(f"Daily Technical Dashboard — v{VERSION}")
 
-c1, c2 = st.columns([1.25, 0.75])
-with c1:
-    ticker = st.text_input("Ticker (press Enter)", value="SPY").strip().upper()
+c1, c2, c3 = st.columns([1,2,1])
+
 with c2:
-    st.empty()
+    ticker = st.text_input(
+        "Ticker (press Enter)",
+        value="SPY"
+    )
 
 # Ticker + current price (under the title)
 last_q, chg_q, pct_q = get_quote(ticker)
