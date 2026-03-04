@@ -1151,29 +1151,7 @@ if df.empty:
     st.stop()
 
 
-# Ticker + price line (under the title)
-q = get_quote(ticker)
-last = q.get("last", float("nan"))
-prev = q.get("prev", float("nan"))
-chg = q.get("chg", float("nan"))
-pct = q.get("pct", float("nan"))
 
-if np.isfinite(last):
-    up = np.isfinite(chg) and chg > 0
-    down = np.isfinite(chg) and chg < 0
-    color = "#00A000" if up else ("#D00000" if down else "#cfcfcf")
-    arrow = "▲" if up else ("▼" if down else "")
-    chg_txt = f"{chg:+.2f}" if np.isfinite(chg) else "—"
-    pct_txt = f"({pct:+.2%})" if np.isfinite(pct) else ""
-    st.markdown(
-        f"""
-        <div style="margin-top:-6px;margin-bottom:10px;font-size:18px;font-weight:800;color:#e6e6e6;">
-          {ticker} <span style="font-weight:900;">${last:,.2f}</span>
-          <span style="margin-left:10px;color:{color};font-weight:900;">{arrow} {chg_txt} {pct_txt}</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
 
 # Indicators (regular price)
