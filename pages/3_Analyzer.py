@@ -1073,6 +1073,22 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
         except Exception:
             pass
 
+    # --- Layout polish: remove "gap" by placing legend INSIDE the chart area ---
+    fig.update_layout(
+        margin=dict(t=70, r=20, b=40, l=60),
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=0.995,      # inside plot area (prevents big reserved gap)
+            xanchor="left",
+            x=0.01,
+            bgcolor="rgba(0,0,0,0)",
+            font=dict(size=12),
+            tracegroupgap=6,
+        ),
+    )
+
+
     return fig
 
 def scoring_chart(components: List[tuple]) -> go.Figure:
