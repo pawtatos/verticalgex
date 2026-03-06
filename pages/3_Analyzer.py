@@ -1039,59 +1039,65 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
     vis_regular = [True, False, True] + [True] * max(0, n_traces - 3)
     vis_heikin  = [False, True, True] + [True] * max(0, n_traces - 3)
 
+    # Keep the range selector and candle selector on separate rows for mobile.
+    range_menu = dict(
+        type="buttons",
+        direction="left",
+        x=0.0,
+        y=(1.12 if MOBILE else 1.05),
+        xanchor="left",
+        yanchor="top",
+        pad=dict(r=4 if MOBILE else 6, t=0),
+        bgcolor="rgba(245,245,245,0.95)",
+        bordercolor="rgba(0,0,0,0.20)",
+        borderwidth=1,
+        font=dict(size=10 if MOBILE else 12, color="black"),
+        active=1,
+        buttons=[
+            dict(label="3M", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [range_3m, x_end]}]),
+            dict(label="6M", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [range_6m, x_end]}]),
+            dict(label="YTD", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [ytd_start, x_end]}]),
+            dict(label="1Y", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [range_1y, x_end]}]),
+            dict(label="2Y", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [range_2y, x_end]}]),
+            dict(label="5Y", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [range_5y, x_end]}]),
+            dict(label="All", method="relayout", args=[{"xaxis.autorange": True}]),
+        ],
+    )
+
+    candle_menu = dict(
+        type="buttons",
+        direction="left",
+        x=(0.0 if MOBILE else 0.32),
+        y=(1.045 if MOBILE else 1.05),
+        xanchor="left",
+        yanchor="top",
+        pad=dict(r=4 if MOBILE else 6, t=0),
+        bgcolor="rgba(245,245,245,0.95)",
+        bordercolor="rgba(0,0,0,0.20)",
+        borderwidth=1,
+        font=dict(size=10 if MOBILE else 12, color="black"),
+        active=0,
+        buttons=[
+            dict(label="Regular", method="update", args=[{"visible": vis_regular}]),
+            dict(label="Heikin Ashi", method="update", args=[{"visible": vis_heikin}]),
+        ],
+    )
+
     fig.update_layout(
         template="plotly_white",
         height=960,
-        margin=dict(l=10, r=110, t=120, b=10),
+        margin=dict(l=(8 if MOBILE else 10), r=(14 if MOBILE else 110), t=(158 if MOBILE else 120), b=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
         dragmode="pan",
         hovermode="x unified",
         hoverdistance=40,
         spikedistance=100000,
-        font=dict(size=13),
+        font=dict(size=12 if MOBILE else 13),
         hoverlabel=dict(bgcolor="rgba(255,255,255,0.95)", font=dict(color="black")),
         xaxis_rangeslider_visible=False,
         shapes=guide_shapes,
         annotations=annotations,
-        updatemenus=[
-            dict(
-                type="buttons",
-                direction="left",
-                x=0.0, y=1.05,
-                xanchor="left", yanchor="top",
-                pad=dict(r=6, t=0),
-                bgcolor="rgba(245,245,245,0.95)",
-                bordercolor="rgba(0,0,0,0.20)",
-                borderwidth=1,
-                font=dict(size=12, color="black"),
-                active=1,
-                buttons=[
-                    dict(label="3M", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [range_3m, x_end]}]),
-                    dict(label="6M", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [range_6m, x_end]}]),
-                    dict(label="YTD", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [ytd_start, x_end]}]),
-                    dict(label="1Y", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [range_1y, x_end]}]),
-                    dict(label="2Y", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [range_2y, x_end]}]),
-                    dict(label="5Y", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [range_5y, x_end]}]),
-                    dict(label="All", method="relayout", args=[{"xaxis.autorange": True}]),
-                ],
-            ),
-            dict(
-                type="buttons",
-                direction="left",
-                x=0.32, y=1.05,
-                xanchor="left", yanchor="top",
-                pad=dict(r=6, t=0),
-                bgcolor="rgba(245,245,245,0.95)",
-                bordercolor="rgba(0,0,0,0.20)",
-                borderwidth=1,
-                font=dict(size=12, color="black"),
-                active=0,
-                buttons=[
-                    dict(label="Regular", method="update", args=[{"visible": vis_regular}]),
-                    dict(label="Heikin Ashi", method="update", args=[{"visible": vis_heikin}]),
-                ],
-            ),
-        ],
+        updatemenus=[range_menu, candle_menu],
     )
 
     fig.update_xaxes(
