@@ -1086,7 +1086,7 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
     fig.update_layout(
         template="plotly_white",
         height=960,
-        margin=dict(l=(8 if MOBILE else 10), r=(14 if MOBILE else 110), t=(158 if MOBILE else 120), b=10),
+        margin=dict(l=(8 if MOBILE else 10), r=(14 if MOBILE else 110), t=(118 if MOBILE else 120), b=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
         dragmode="pan",
         hovermode="x unified",
@@ -1097,7 +1097,7 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
         xaxis_rangeslider_visible=False,
         shapes=guide_shapes,
         annotations=annotations,
-        updatemenus=[range_menu, candle_menu],
+        updatemenus=([candle_menu] if MOBILE else [range_menu, candle_menu]),
     )
 
     fig.update_xaxes(
@@ -1158,18 +1158,17 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
     # IMPORTANT: on mobile, keep a large top margin so the selector rows and legend
     # live above the plot area instead of overlapping candles / EMA lines.
     if MOBILE:
-        # Push the control rows higher into the top margin
+        # Mobile: remove the range selector entirely and keep only the candle toggle.
         fig.update_layout(
             updatemenus=[
-                dict(range_menu, y=1.24, x=0.00, font=dict(size=9, color="black"), pad=dict(r=2, t=0)),
-                dict(candle_menu, y=1.13, x=0.00, font=dict(size=9, color="black"), pad=dict(r=2, t=0)),
+                dict(candle_menu, y=1.11, x=0.00, font=dict(size=9, color="black"), pad=dict(r=2, t=0)),
             ],
             height=620,
-            margin=dict(t=148, r=8, b=28, l=42),
+            margin=dict(t=112, r=8, b=28, l=42),
             legend=dict(
                 orientation="h",
                 yanchor="top",
-                y=1.04,
+                y=1.03,
                 xanchor="left",
                 x=0.01,
                 bgcolor="rgba(255,255,255,0.92)",
