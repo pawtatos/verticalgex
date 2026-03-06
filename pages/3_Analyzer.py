@@ -46,6 +46,39 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+
+# --- Mobile helpers ---
+def _detect_mobile() -> bool:
+    """Best-effort mobile heuristic.
+    - Uses Streamlit screen width when available.
+    - Falls back to `?mobile=true` query param.
+    """
+    w = st.session_state.get("_st_screen_width", None)
+    if isinstance(w, (int, float)):
+        return w <= 768
+    qp = st.query_params
+    if str(qp.get("mobile", "")).lower() in ("1", "true", "yes"):
+        return True
+    return False
+
+MOBILE = _detect_mobile()
+st.session_state["MOBILE"] = MOBILE
+
+st.markdown(
+    """
+<style>
+@media (max-width: 768px) {
+  .block-container { padding-top: 0.75rem !important; padding-left: 0.9rem !important; padding-right: 0.9rem !important; }
+  h1 { font-size: 1.35rem !important; line-height: 1.2 !important; }
+  h2, h3 { font-size: 1.1rem !important; }
+  div[data-testid="stPlotlyChart"] { margin-top: -6px; }
+}
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
 st.markdown("""
 <style>
 /* move plotly toolbar down */
@@ -1146,18 +1179,28 @@ def scoring_chart(components: List[tuple]) -> go.Figure:
 # =========================
 st.title(f"Daily Technical Dashboard — v{VERSION}")
 
-c1, c2, _ = st.columns([1, 2, 28])
 
-with c1:
-    st.markdown("<div style='padding-top:6px; font-weight:600;'>Ticker:</div>", unsafe_allow_html=True)
-
-with c2:
+if MOBILE:
+    st.markdown("<div style='font-weight:600; margin-bottom:6px;'>Ticker</div>", unsafe_allow_html=True)
     ticker = st.text_input(
         "",
         value="",
         placeholder="Enter ticker",
         label_visibility="collapsed",
     ).strip().upper()
+else:
+    c1, c2, _ = st.columns([1, 2, 28])
+
+    with c1:
+        st.markdown("<div style='padding-top:6px; font-weight:600;'>Ticker:</div>", unsafe_allow_html=True)
+
+    with c2:
+        ticker = st.text_input(
+            "",
+            value="",
+            placeholder="Enter ticker",
+            label_visibility="collapsed",
+        ).strip().upper()
 
 # Ticker + current price (under the title)
 last_q, chg_q, pct_q = get_quote(ticker)
@@ -1224,41 +1267,48 @@ verdict = build_verdict(
     prev_ema50=prev_ema50,
 )
 
-left, right = st.columns([1.55, 1.05])
 
-with left:
-    # st.subheader("")
+def render_chart_block():
     st.markdown(
-    f"""
-    <div style="display:flex; justify-content:center; margin-bottom:14px;">
-        <div style="
-            padding:8px 14px;
-            border-radius:12px;
-            background:rgba(255,255,255,0.05);
-            border:1px solid rgba(255,255,255,0.12);
-            font-size:18px;
-            font-weight:600;
-        ">
-            {ticker} ${last_q:,.2f}
-            <span style="color:{color}; margin-left:10px;">
-                {arrow} {chg_q:+.2f} ({pct_q:+.2%})
-            </span>
+        f"""
+        <div style="display:flex; justify-content:center; margin-bottom:14px;">
+            <div style="
+                padding:8px 14px;
+                border-radius:12px;
+                background:rgba(255,255,255,0.05);
+                border:1px solid rgba(255,255,255,0.12);
+                font-size:{'16px' if MOBILE else '18px'};
+                font-weight:600;
+                max-width: 100%;
+            ">
+                {ticker} ${last_q:,.2f}
+                <span style="color:{color}; margin-left:10px;">
+                    {arrow} {chg_q:+.2f} ({pct_q:+.2%})
+                </span>
+            </div>
         </div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-    
+        """,
+        unsafe_allow_html=True
+    )
+
     ruler_y = st.session_state.get("ruler_y")
     fig = make_chart(df, ruler_y=ruler_y)
 
+    # Mobile-friendly sizing
+    fig.update_layout(height=620 if MOBILE else 960)
+
+    chart_config = {
+        "scrollZoom": True,
+        "displayModeBar": True,
+        "displaylogo": False,
+    }
+    if MOBILE:
+        chart_config["modeBarButtonsToRemove"] = ["lasso2d", "select2d"]
+
     if plotly_events is None:
-        st.plotly_chart(
-            fig,
-            use_container_width=True,
-            config={"scrollZoom": True, "displayModeBar": True, "displaylogo": False},
-        )
-        st.caption("Optional: `pip install streamlit-plotly-events` to enable hover price ruler (snaps to bar close).")
+        st.plotly_chart(fig, use_container_width=True, config=chart_config)
+        if not MOBILE:
+            st.caption("Optional: `pip install streamlit-plotly-events` to enable hover price ruler (snaps to bar close).")
     else:
         hovered = plotly_events(
             fig,
@@ -1275,27 +1325,26 @@ with left:
                 except Exception:
                     pass
 
-        st.plotly_chart(
-            fig,
-            use_container_width=True,
-            config={"scrollZoom": True, "displayModeBar": True, "displaylogo": False},
-        )
+        st.plotly_chart(fig, use_container_width=True, config=chart_config)
 
-        if st.session_state.get("ruler_y") is not None:
+        if st.session_state.get("ruler_y") is not None and not MOBILE:
             st.markdown(
                 f"<div style=\"margin-top:6px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);font-weight:900;display:inline-block;\">Ruler price (hover close): {st.session_state['ruler_y']:,.2f}</div>",
                 unsafe_allow_html=True,
             )
 
-with right:
+def render_right_panel():
     st.subheader("Snapshot")
 
-    tile_grid(items=[
-        {"label":"Next Support", "value": (f"{next_sup:,.2f}" if next_sup is not None else "—")},
-        {"label":"Next Resistance", "value": (f"{next_res:,.2f}" if next_res is not None else "—")},
-        {"label":"Major Support", "value": (f"{major_sup:,.2f}" if major_sup is not None else "—")},
-        {"label":"Major Resistance", "value": (f"{major_res:,.2f}" if major_res is not None else "—")},
-    ], cols=4)
+    tile_grid(
+        items=[
+            {"label": "Next Support", "value": (f"{next_sup:,.2f}" if next_sup is not None else "—")},
+            {"label": "Next Resistance", "value": (f"{next_res:,.2f}" if next_res is not None else "—")},
+            {"label": "Major Support", "value": (f"{major_sup:,.2f}" if major_sup is not None else "—")},
+            {"label": "Major Resistance", "value": (f"{major_res:,.2f}" if major_res is not None else "—")},
+        ],
+        cols=(2 if MOBILE else 4),
+    )
 
     st.subheader(f"Analysis — {verdict.label}")
     if verdict.label == "Ready":
@@ -1318,8 +1367,6 @@ with right:
     big_picture = "positive" if above200 else "still weak"
     short_term = "above" if (above20 and above50) else ("partly above" if above20 else "below")
 
-    
-    # Determine confidence color
     conf_color = "#22c55e" if verdict.confidence_label == "High" else ("#eab308" if verdict.confidence_label == "Moderate" else "#ef4444")
 
     summary_text = (
@@ -1330,46 +1377,88 @@ with right:
     st.markdown(
         f"""
         <div style="padding:12px 14px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);margin-bottom:10px;font-size:14px;line-height:1.4;">
-        <div style="font-weight:900;">Quick Summary</div><div style="margin-top:6px;">{summary_text}</div><div style="margin-top:8px;opacity:0.9;font-weight:800;">{verdict.confidence_pct}% ({verdict.confidence_label})</div>
+        <div style="font-weight:900;">Quick Summary</div><div style="margin-top:6px;">{summary_text}</div><div style="margin-top:8px;opacity:0.9;font-weight:800;color:{conf_color};">{verdict.confidence_pct}% ({verdict.confidence_label})</div>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
-    st.markdown("**Score breakdown (what the app is counting):**")
-    fig_score = scoring_chart(verdict.components)
-    st.plotly_chart(fig_score, use_container_width=True, config={"displayModeBar": False})
+    if MOBILE:
+        with st.expander("Score breakdown", expanded=False):
+            st.markdown("**Score breakdown (what the app is counting):**")
+            fig_score = scoring_chart(verdict.components)
+            st.plotly_chart(fig_score, use_container_width=True, config={"displayModeBar": False})
 
-    # Distance to nearby levels (simple risk/room gauge)
-    dist_items = []
-    if next_res is not None:
-        dist_r = (next_res / close_now - 1.0) * 100.0
-        dist_items.append(("Distance to Resistance", f"{dist_r:+.2f}%"))
-    if next_sup is not None:
-        dist_s = (close_now / next_sup - 1.0) * 100.0
-        dist_items.append(("Distance to Support", f"{dist_s:+.2f}%"))
-    if dist_items:
-        st.markdown("**Distance to levels (room / risk):**")
-        for k, v in dist_items:
-            st.write(f"- {k}: {v}")
+        # Distance to nearby levels
+        dist_items = []
+        if next_res is not None:
+            dist_r = (next_res / close_now - 1.0) * 100.0
+            dist_items.append(("Distance to Resistance", f"{dist_r:+.2f}%"))
+        if next_sup is not None:
+            dist_s = (close_now / next_sup - 1.0) * 100.0
+            dist_items.append(("Distance to Support", f"{dist_s:+.2f}%"))
+        if dist_items:
+            with st.expander("Distance to levels (room / risk)", expanded=False):
+                for k, v in dist_items:
+                    st.write(f"- {k}: {v}")
 
-    with st.expander("How scoring & confidence work (simple)"):
-        st.write("This app uses a **points system** to summarize the chart signals.")
-        st.write("- **+ points** = signals lean bullish")
-        st.write("- **0 points** = neutral / unclear")
-        st.write("- **− points** = signals lean bearish")
-        st.write("**Confidence** is based on the total score and reflects how **aligned** the signals are (not a guarantee).")
+        with st.expander("Why this label", expanded=True):
+            for line in verdict.explanations:
+                st.write(f"- {line}")
 
-    st.markdown("**Why this label (plain English):**")
-    for line in verdict.explanations:
-        st.write(f"- {line}")
+        with st.expander("Guide", expanded=False):
+            st.write("- EMAs: EMA20/50 = short-term; EMA200 = bigger trend. A reclaim is stronger when slopes turn up too.")
+            st.write("- RSI: 50 is neutral; >55 supportive; <45 weak.")
+            st.write("- Stoch RSI: 20/80 are oversold/overbought. Crosses near those zones can signal turns.")
+            st.write("- Volume: above-average volume makes breakouts/breakdowns more believable.")
+            st.write("- Support/Resistance: Next = nearest level; Major = highest-strength zone from clustering.")
+    else:
+        st.markdown("**Score breakdown (what the app is counting):**")
+        fig_score = scoring_chart(verdict.components)
+        st.plotly_chart(fig_score, use_container_width=True, config={"displayModeBar": False})
 
-    with st.expander("How to read these indicators (simple guide)"):
-        st.write("- EMAs: EMA20/50 = short-term; EMA200 = bigger trend. A reclaim is stronger when slopes turn up too.")
-        st.write("- RSI: 50 is neutral; >55 supportive; <45 weak.")
-        st.write("- Stoch RSI: 20/80 are oversold/overbought. Crosses near those zones can signal turns.")
-        st.write("- Volume: above-average volume makes breakouts/breakdowns more believable.")
-        st.write("- Support/Resistance: Next = nearest level; Major = highest-strength zone from clustering.")
+        # Distance to nearby levels (simple risk/room gauge)
+        dist_items = []
+        if next_res is not None:
+            dist_r = (next_res / close_now - 1.0) * 100.0
+            dist_items.append(("Distance to Resistance", f"{dist_r:+.2f}%"))
+        if next_sup is not None:
+            dist_s = (close_now / next_sup - 1.0) * 100.0
+            dist_items.append(("Distance to Support", f"{dist_s:+.2f}%"))
+        if dist_items:
+            st.markdown("**Distance to levels (room / risk):**")
+            for k, v in dist_items:
+                st.write(f"- {k}: {v}")
+
+        with st.expander("How scoring & confidence work (simple)"):
+            st.write("This app uses a **points system** to summarize the chart signals.")
+            st.write("- **+ points** = signals lean bullish")
+            st.write("- **0 points** = neutral / unclear")
+            st.write("- **− points** = signals lean bearish")
+            st.write("**Confidence** is based on the total score and reflects how **aligned** the signals are (not a guarantee).")
+
+        st.markdown("**Why this label (plain English):**")
+        for line in verdict.explanations:
+            st.write(f"- {line}")
+
+        with st.expander("How to read these indicators (simple guide)"):
+            st.write("- EMAs: EMA20/50 = short-term; EMA200 = bigger trend. A reclaim is stronger when slopes turn up too.")
+            st.write("- RSI: 50 is neutral; >55 supportive; <45 weak.")
+            st.write("- Stoch RSI: 20/80 are oversold/overbought. Crosses near those zones can signal turns.")
+            st.write("- Volume: above-average volume makes breakouts/breakdowns more believable.")
+            st.write("- Support/Resistance: Next = nearest level; Major = highest-strength zone from clustering.")
+
+# ---- layout ----
+if MOBILE:
+    render_chart_block()
+    st.divider()
+    render_right_panel()
+else:
+    left, right = st.columns([1.55, 1.05])
+    with left:
+        render_chart_block()
+    with right:
+        render_right_panel()
 
 with st.expander("Debug (last 40 rows)"):
     cols = ["Open", "High", "Low", "Close", "Volume", "EMA20", "EMA50", "EMA200", "RSI", "%K", "%D", "SR_S", "SR_R"]
