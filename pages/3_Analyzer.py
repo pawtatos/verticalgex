@@ -1158,10 +1158,20 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
     # IMPORTANT: on mobile, keep a large top margin so the selector rows and legend
     # live above the plot area instead of overlapping candles / EMA lines.
     if MOBILE:
-        # Mobile: remove the range selector entirely and keep only the candle toggle.
+        # Mobile: remove the range selector entirely and keep only the candle toggle, left-aligned.
         fig.update_layout(
             updatemenus=[
-                dict(candle_menu, y=1.11, x=0.00, font=dict(size=9, color="black"), pad=dict(r=2, t=0)),
+                dict(
+                    candle_menu,
+                    x=0.0,
+                    xanchor="left",
+                    y=1.12,
+                    yanchor="top",
+                    direction="left",
+                    showactive=True,
+                    pad=dict(r=0, t=0),
+                    font=dict(size=9, color="black"),
+                ),
             ],
             height=620,
             margin=dict(t=112, r=8, b=28, l=42),
@@ -1354,7 +1364,6 @@ def render_chart_block():
     if plotly_events is None:
         st.plotly_chart(fig, use_container_width=True, config=chart_config)
         if not MOBILE:
-            st.caption("Optional: `pip install streamlit-plotly-events` to enable hover price ruler (snaps to bar close).")
     else:
         hovered = plotly_events(
             fig,
