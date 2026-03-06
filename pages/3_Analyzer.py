@@ -46,66 +46,14 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-
-
-# --- Mobile helpers ---
-def _detect_mobile() -> bool:
-    """Best-effort mobile heuristic.
-    - Uses Streamlit screen width when available.
-    - Falls back to `?mobile=true` query param (supports both new and old Streamlit APIs).
-    """
-    # 1) Screen width (only exists in some builds / custom frontends)
-    w = st.session_state.get("_st_screen_width", None)
-    if isinstance(w, (int, float)):
-        return w <= 768
-
-    # 2) Query params (Streamlit 1.30+: st.query_params, older: st.experimental_get_query_params)
-    try:
-        qp = st.query_params
-        mobile_flag = qp.get("mobile", "")
-    except Exception:
-        try:
-            qp = st.experimental_get_query_params()
-            mobile_flag = (qp.get("mobile", [""])[0] if isinstance(qp.get("mobile", ""), list) else qp.get("mobile", ""))
-        except Exception:
-            mobile_flag = ""
-
-    if str(mobile_flag).lower() in ("1", "true", "yes"):
-        return True
-    return False
-
-MOBILE = _detect_mobile()
-st.session_state["MOBILE"] = MOBILE
-
-st.markdown(
-    """
+st.markdown("""
 <style>
-@media (max-width: 768px) {
-  .block-container { padding-top: 0.55rem !important; padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
-  h1 { font-size: 1.25rem !important; line-height: 1.15 !important; }
-  h2, h3 { font-size: 1.02rem !important; }
-  div[data-testid="stPlotlyChart"] { margin-top: -4px; }
-  .js-plotly-plot .modebar { display: none !important; }
-  .js-plotly-plot .plotly .modebar { display: none !important; }
+/* move plotly toolbar down */
+.js-plotly-plot .modebar {
+    top: 30px !important;
 }
 </style>
-""",
-    unsafe_allow_html=True,
-)
-
-if not MOBILE:
-    st.markdown("""
-    <style>
-    /* move plotly toolbar down (desktop only) */
-    .js-plotly-plot .modebar {
-        top: 30px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-else:
-    # On mobile we keep the modebar hidden to avoid overlaps
-    pass
-
+""", unsafe_allow_html=True)
 
 st.markdown("""
 <style>
@@ -116,7 +64,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def top_nav(active: str = "analyzer"):
-    # Responsive top nav (2x2 on mobile, 1x4 on desktop)
     st.markdown(
         """
         <style>
@@ -127,56 +74,42 @@ def top_nav(active: str = "analyzer"):
             border-radius: 12px !important;
             font-weight: 850 !important;
             height: 42px !important;
-            padding: 0 10px !important;
-            white-space: nowrap !important;
           }
           .navbtn.active button {
             border: 2px solid rgba(80,170,255,0.95) !important;
             background: rgba(80,170,255,0.20) !important;
             box-shadow: inset 0 -4px 0 rgba(80,170,255,0.95) !important;
           }
-          @media (max-width: 768px) {
-            .navbtn button {
-              height: 34px !important;
-              font-size: 11px !important;
-              padding: 0 6px !important;
-              white-space: normal !important;
-              line-height: 1.05 !important;
-            }
-          }
         </style>
-        """
-        , unsafe_allow_html=True
+        """,
+        unsafe_allow_html=True
     )
 
-    def _nav_button(label: str, page: str, key: str):
-        st.markdown('<div class="navbtn %s">' % ("active" if active==key else ""), unsafe_allow_html=True)
-        if st.button(label, use_container_width=True):
-            st.switch_page(page)
+    c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
+
+    with c1:
+        st.markdown('<div class="navbtn %s">' % ("active" if active=="gex" else ""), unsafe_allow_html=True)
+        if st.button("GEX", use_container_width=True):
+            st.switch_page("app.py")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    if MOBILE:
-        r1c1, r1c2 = st.columns(2)
-        with r1c1:
-            _nav_button("GEX", "app.py", "gex")
-        with r1c2:
-            _nav_button("Leverage", "pages/1_Leverage_Equivalence.py", "lev")
+    with c2:
+        st.markdown('<div class="navbtn %s">' % ("active" if active=="lev" else ""), unsafe_allow_html=True)
+        if st.button("Leveraged Converter", use_container_width=True):
+            st.switch_page("pages/1_Leverage_Equivalence.py")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        r2c1, r2c2 = st.columns(2)
-        with r2c1:
-            _nav_button("Put DCA", "pages/2_Synthetic_Put_DCA.py", "dca")
-        with r2c2:
-            _nav_button("Analyzer", "pages/3_Analyzer.py", "analyzer")
-    else:
-        c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
-        with c1:
-            _nav_button("GEX", "app.py", "gex")
-        with c2:
-            _nav_button("Leveraged Converter", "pages/1_Leverage_Equivalence.py", "lev")
-        with c3:
-            _nav_button("Synthetic Put DCA", "pages/2_Synthetic_Put_DCA.py", "dca")
-        with c4:
-            _nav_button("Analyzer", "pages/3_Analyzer.py", "analyzer")
+    with c3:
+        st.markdown('<div class="navbtn %s">' % ("active" if active=="dca" else ""), unsafe_allow_html=True)
+        if st.button("Synthetic Put DCA", use_container_width=True):
+            st.switch_page("pages/2_Synthetic_Put_DCA.py")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with c4:
+        st.markdown('<div class="navbtn %s">' % ("active" if active=="analyzer" else ""), unsafe_allow_html=True)
+        if st.button("Analyzer", use_container_width=True):
+            st.switch_page("pages/3_Analyzer.py")
+        st.markdown("</div>", unsafe_allow_html=True)
 
 top_nav(active="analyzer")
 
@@ -1039,65 +972,38 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
     vis_regular = [True, False, True] + [True] * max(0, n_traces - 3)
     vis_heikin  = [False, True, True] + [True] * max(0, n_traces - 3)
 
-    # Range selector removed to avoid mobile overlap issues; candle selector stays.
-    range_menu = dict(
-        type="buttons",
-        direction="left",
-        x=0.0,
-        y=(1.12 if MOBILE else 1.05),
-        xanchor="left",
-        yanchor="top",
-        pad=dict(r=4 if MOBILE else 6, t=0),
-        bgcolor="rgba(245,245,245,0.95)",
-        bordercolor="rgba(0,0,0,0.20)",
-        borderwidth=1,
-        font=dict(size=10 if MOBILE else 12, color="black"),
-        active=1,
-        buttons=[
-            dict(label="3M", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [range_3m, x_end]}]),
-            dict(label="6M", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [range_6m, x_end]}]),
-            dict(label="YTD", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [ytd_start, x_end]}]),
-            dict(label="1Y", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [range_1y, x_end]}]),
-            dict(label="2Y", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [range_2y, x_end]}]),
-            dict(label="5Y", method="relayout", args=[{"xaxis.autorange": False, "xaxis.range": [range_5y, x_end]}]),
-            dict(label="All", method="relayout", args=[{"xaxis.autorange": True}]),
-        ],
-    )
-
-    candle_menu = dict(
-        type="buttons",
-        direction="left",
-        x=(0.0 if MOBILE else 0.32),
-        y=(1.045 if MOBILE else 1.05),
-        xanchor="left",
-        yanchor="top",
-        pad=dict(r=4 if MOBILE else 6, t=0),
-        bgcolor="rgba(245,245,245,0.95)",
-        bordercolor="rgba(0,0,0,0.20)",
-        borderwidth=1,
-        font=dict(size=10 if MOBILE else 12, color="black"),
-        active=0,
-        buttons=[
-            dict(label="Regular", method="update", args=[{"visible": vis_regular}]),
-            dict(label="Heikin Ashi", method="update", args=[{"visible": vis_heikin}]),
-        ],
-    )
-
     fig.update_layout(
         template="plotly_white",
         height=960,
-        margin=dict(l=(8 if MOBILE else 10), r=(14 if MOBILE else 110), t=(118 if MOBILE else 120), b=10),
+        margin=dict(l=10, r=110, t=120, b=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
         dragmode="pan",
         hovermode="x unified",
         hoverdistance=40,
         spikedistance=100000,
-        font=dict(size=12 if MOBILE else 13),
+        font=dict(size=13),
         hoverlabel=dict(bgcolor="rgba(255,255,255,0.95)", font=dict(color="black")),
         xaxis_rangeslider_visible=False,
         shapes=guide_shapes,
         annotations=annotations,
-        updatemenus=[candle_menu],
+        updatemenus=[
+            dict(
+                type="buttons",
+                direction="left",
+                x=0.0, y=1.16,
+                xanchor="left", yanchor="top",
+                pad=dict(r=6, t=0),
+                bgcolor="rgba(245,245,245,0.95)",
+                bordercolor="rgba(0,0,0,0.20)",
+                borderwidth=1,
+                font=dict(size=12, color="black"),
+                active=0,
+                buttons=[
+                    dict(label="Regular", method="update", args=[{"visible": vis_regular}]),
+                    dict(label="Heikin Ashi", method="update", args=[{"visible": vis_heikin}]),
+                ],
+            ),
+        ],
     )
 
     fig.update_xaxes(
@@ -1134,75 +1040,21 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
     fig.update_yaxes(title_text="Volume", row=2, col=1, showgrid=True, gridcolor="rgba(0,0,0,0.08)", showticklabels=False)
     fig.update_yaxes(title_text="RSI / StochRSI", row=3, col=1, range=[0, 100], showgrid=True, gridcolor="rgba(0,0,0,0.08)")
 
-    # Optional price ruler line (hover-driven; snaps to hovered Close)
-    if ruler_y is not None:
-        try:
-            yv = float(ruler_y)
-            fig.add_hline(
-                y=yv,
-                line_width=1,
-                line_dash="dot",
-                line_color="white",
-                opacity=0.9,
-                annotation_text=f"{yv:,.2f}",
-                annotation_position="right",
-                annotation_font=dict(color="white", size=12),
-                annotation_bgcolor="rgba(0,0,0,0.55)",
-                annotation_bordercolor="rgba(255,255,255,0.25)",
-                annotation_borderpad=3,
-            )
-        except Exception:
-            pass
+    # --- Layout polish: remove "gap" by placing legend INSIDE the chart area ---
+    fig.update_layout(
+        margin=dict(t=145, r=20, b=40, l=60),
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=1.08,
+            xanchor="left",
+            x=0.01,
+            bgcolor="rgba(0,0,0,0)",
+            font=dict(size=12),
+            tracegroupgap=6,
+        ),
+    )
 
-    # --- Final layout polish ---
-    # IMPORTANT: on mobile, keep a large top margin so the selector rows and legend
-    # live above the plot area instead of overlapping candles / EMA lines.
-    if MOBILE:
-        # Mobile: remove the range selector entirely and keep only the candle toggle, left-aligned.
-        fig.update_layout(
-            updatemenus=[
-                dict(
-                    candle_menu,
-                    x=0.0,
-                    xanchor="left",
-                    y=1.12,
-                    yanchor="top",
-                    direction="left",
-                    showactive=True,
-                    pad=dict(r=0, t=0),
-                    font=dict(size=9, color="black"),
-                ),
-            ],
-            height=620,
-            margin=dict(t=112, r=8, b=28, l=42),
-            legend=dict(
-                orientation="h",
-                yanchor="top",
-                y=1.03,
-                xanchor="left",
-                x=0.01,
-                bgcolor="rgba(255,255,255,0.92)",
-                font=dict(size=9),
-                tracegroupgap=4,
-                itemwidth=30,
-            ),
-            dragmode="pan",
-        )
-    else:
-        fig.update_layout(
-            margin=dict(t=70, r=20, b=40, l=60),
-            legend=dict(
-                orientation="h",
-                yanchor="top",
-                y=0.995,
-                xanchor="left",
-                x=0.01,
-                bgcolor="rgba(0,0,0,0)",
-                font=dict(size=12),
-                tracegroupgap=6,
-            ),
-            dragmode="pan",
-        )
 
     return fig
 
@@ -1233,28 +1085,18 @@ def scoring_chart(components: List[tuple]) -> go.Figure:
 # =========================
 st.title(f"Daily Technical Dashboard — v{VERSION}")
 
+c1, c2, _ = st.columns([1, 2, 28])
 
-if MOBILE:
-    st.markdown("<div style='font-weight:600; margin-bottom:6px;'>Ticker</div>", unsafe_allow_html=True)
+with c1:
+    st.markdown("<div style='padding-top:6px; font-weight:600;'>Ticker:</div>", unsafe_allow_html=True)
+
+with c2:
     ticker = st.text_input(
         "",
         value="",
         placeholder="Enter ticker",
         label_visibility="collapsed",
     ).strip().upper()
-else:
-    c1, c2, _ = st.columns([1, 2, 28])
-
-    with c1:
-        st.markdown("<div style='padding-top:6px; font-weight:600;'>Ticker:</div>", unsafe_allow_html=True)
-
-    with c2:
-        ticker = st.text_input(
-            "",
-            value="",
-            placeholder="Enter ticker",
-            label_visibility="collapsed",
-        ).strip().upper()
 
 # Ticker + current price (under the title)
 last_q, chg_q, pct_q = get_quote(ticker)
@@ -1321,49 +1163,40 @@ verdict = build_verdict(
     prev_ema50=prev_ema50,
 )
 
+left, right = st.columns([1.55, 1.05])
 
-def render_chart_block():
+with left:
+    # st.subheader("")
     st.markdown(
-        f"""
-        <div style="display:flex; justify-content:center; margin-bottom:14px;">
-            <div style="
-                padding:8px 14px;
-                border-radius:12px;
-                background:rgba(255,255,255,0.05);
-                border:1px solid rgba(255,255,255,0.12);
-                font-size:{'16px' if MOBILE else '18px'};
-                font-weight:600;
-                max-width: 100%;
-            ">
-                {ticker} ${last_q:,.2f}
-                <span style="color:{color}; margin-left:10px;">
-                    {arrow} {chg_q:+.2f} ({pct_q:+.2%})
-                </span>
-            </div>
+    f"""
+    <div style="display:flex; justify-content:center; margin-bottom:14px;">
+        <div style="
+            padding:8px 14px;
+            border-radius:12px;
+            background:rgba(255,255,255,0.05);
+            border:1px solid rgba(255,255,255,0.12);
+            font-size:18px;
+            font-weight:600;
+        ">
+            {ticker} ${last_q:,.2f}
+            <span style="color:{color}; margin-left:10px;">
+                {arrow} {chg_q:+.2f} ({pct_q:+.2%})
+            </span>
         </div>
-        """,
-        unsafe_allow_html=True
-    )
-
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+    
     ruler_y = st.session_state.get("ruler_y")
     fig = make_chart(df, ruler_y=ruler_y)
 
-    # Mobile-friendly sizing
-    fig.update_layout(height=620 if MOBILE else 960)
-
-    chart_config = {
-        "scrollZoom": False if MOBILE else True,
-        "displayModeBar": False if MOBILE else True,
-        "displaylogo": False,
-        "responsive": True,
-        "doubleClick": False,
-    }
-    if MOBILE:
-        chart_config["modeBarButtonsToRemove"] = ["zoom2d", "pan2d", "lasso2d", "select2d", "zoomIn2d", "zoomOut2d", "autoScale2d", "resetScale2d"]
-
     if plotly_events is None:
-        st.plotly_chart(fig, use_container_width=True, config=chart_config)
-        if not MOBILE:
+        st.plotly_chart(
+            fig,
+            use_container_width=True,
+            config={"scrollZoom": True, "displayModeBar": True, "displaylogo": False},
+        )
     else:
         hovered = plotly_events(
             fig,
@@ -1380,26 +1213,27 @@ def render_chart_block():
                 except Exception:
                     pass
 
-        st.plotly_chart(fig, use_container_width=True, config=chart_config)
+        st.plotly_chart(
+            fig,
+            use_container_width=True,
+            config={"scrollZoom": True, "displayModeBar": True, "displaylogo": False},
+        )
 
-        if st.session_state.get("ruler_y") is not None and not MOBILE:
+        if st.session_state.get("ruler_y") is not None:
             st.markdown(
                 f"<div style=\"margin-top:6px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);font-weight:900;display:inline-block;\">Ruler price (hover close): {st.session_state['ruler_y']:,.2f}</div>",
                 unsafe_allow_html=True,
             )
 
-def render_right_panel():
+with right:
     st.subheader("Snapshot")
 
-    tile_grid(
-        items=[
-            {"label": "Next Support", "value": (f"{next_sup:,.2f}" if next_sup is not None else "—")},
-            {"label": "Next Resistance", "value": (f"{next_res:,.2f}" if next_res is not None else "—")},
-            {"label": "Major Support", "value": (f"{major_sup:,.2f}" if major_sup is not None else "—")},
-            {"label": "Major Resistance", "value": (f"{major_res:,.2f}" if major_res is not None else "—")},
-        ],
-        cols=(2 if MOBILE else 4),
-    )
+    tile_grid(items=[
+        {"label":"Next Support", "value": (f"{next_sup:,.2f}" if next_sup is not None else "—")},
+        {"label":"Next Resistance", "value": (f"{next_res:,.2f}" if next_res is not None else "—")},
+        {"label":"Major Support", "value": (f"{major_sup:,.2f}" if major_sup is not None else "—")},
+        {"label":"Major Resistance", "value": (f"{major_res:,.2f}" if major_res is not None else "—")},
+    ], cols=4)
 
     st.subheader(f"Analysis — {verdict.label}")
     if verdict.label == "Ready":
@@ -1422,6 +1256,8 @@ def render_right_panel():
     big_picture = "positive" if above200 else "still weak"
     short_term = "above" if (above20 and above50) else ("partly above" if above20 else "below")
 
+    
+    # Determine confidence color
     conf_color = "#22c55e" if verdict.confidence_label == "High" else ("#eab308" if verdict.confidence_label == "Moderate" else "#ef4444")
 
     summary_text = (
@@ -1432,88 +1268,46 @@ def render_right_panel():
     st.markdown(
         f"""
         <div style="padding:12px 14px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);margin-bottom:10px;font-size:14px;line-height:1.4;">
-        <div style="font-weight:900;">Quick Summary</div><div style="margin-top:6px;">{summary_text}</div><div style="margin-top:8px;opacity:0.9;font-weight:800;color:{conf_color};">{verdict.confidence_pct}% ({verdict.confidence_label})</div>
+        <div style="font-weight:900;">Quick Summary</div><div style="margin-top:6px;">{summary_text}</div><div style="margin-top:8px;opacity:0.9;font-weight:800;">{verdict.confidence_pct}% ({verdict.confidence_label})</div>
         </div>
         """,
-        unsafe_allow_html=True,
+        unsafe_allow_html=True
     )
 
-    if MOBILE:
-        with st.expander("Score breakdown", expanded=False):
-            st.markdown("**Score breakdown (what the app is counting):**")
-            fig_score = scoring_chart(verdict.components)
-            st.plotly_chart(fig_score, use_container_width=True, config={"displayModeBar": False})
+    st.markdown("**Score breakdown (what the app is counting):**")
+    fig_score = scoring_chart(verdict.components)
+    st.plotly_chart(fig_score, use_container_width=True, config={"displayModeBar": False})
 
-        # Distance to nearby levels
-        dist_items = []
-        if next_res is not None:
-            dist_r = (next_res / close_now - 1.0) * 100.0
-            dist_items.append(("Distance to Resistance", f"{dist_r:+.2f}%"))
-        if next_sup is not None:
-            dist_s = (close_now / next_sup - 1.0) * 100.0
-            dist_items.append(("Distance to Support", f"{dist_s:+.2f}%"))
-        if dist_items:
-            with st.expander("Distance to levels (room / risk)", expanded=False):
-                for k, v in dist_items:
-                    st.write(f"- {k}: {v}")
+    # Distance to nearby levels (simple risk/room gauge)
+    dist_items = []
+    if next_res is not None:
+        dist_r = (next_res / close_now - 1.0) * 100.0
+        dist_items.append(("Distance to Resistance", f"{dist_r:+.2f}%"))
+    if next_sup is not None:
+        dist_s = (close_now / next_sup - 1.0) * 100.0
+        dist_items.append(("Distance to Support", f"{dist_s:+.2f}%"))
+    if dist_items:
+        st.markdown("**Distance to levels (room / risk):**")
+        for k, v in dist_items:
+            st.write(f"- {k}: {v}")
 
-        with st.expander("Why this label", expanded=True):
-            for line in verdict.explanations:
-                st.write(f"- {line}")
+    with st.expander("How scoring & confidence work (simple)"):
+        st.write("This app uses a **points system** to summarize the chart signals.")
+        st.write("- **+ points** = signals lean bullish")
+        st.write("- **0 points** = neutral / unclear")
+        st.write("- **− points** = signals lean bearish")
+        st.write("**Confidence** is based on the total score and reflects how **aligned** the signals are (not a guarantee).")
 
-        with st.expander("Guide", expanded=False):
-            st.write("- EMAs: EMA20/50 = short-term; EMA200 = bigger trend. A reclaim is stronger when slopes turn up too.")
-            st.write("- RSI: 50 is neutral; >55 supportive; <45 weak.")
-            st.write("- Stoch RSI: 20/80 are oversold/overbought. Crosses near those zones can signal turns.")
-            st.write("- Volume: above-average volume makes breakouts/breakdowns more believable.")
-            st.write("- Support/Resistance: Next = nearest level; Major = highest-strength zone from clustering.")
-    else:
-        st.markdown("**Score breakdown (what the app is counting):**")
-        fig_score = scoring_chart(verdict.components)
-        st.plotly_chart(fig_score, use_container_width=True, config={"displayModeBar": False})
+    st.markdown("**Why this label (plain English):**")
+    for line in verdict.explanations:
+        st.write(f"- {line}")
 
-        # Distance to nearby levels (simple risk/room gauge)
-        dist_items = []
-        if next_res is not None:
-            dist_r = (next_res / close_now - 1.0) * 100.0
-            dist_items.append(("Distance to Resistance", f"{dist_r:+.2f}%"))
-        if next_sup is not None:
-            dist_s = (close_now / next_sup - 1.0) * 100.0
-            dist_items.append(("Distance to Support", f"{dist_s:+.2f}%"))
-        if dist_items:
-            st.markdown("**Distance to levels (room / risk):**")
-            for k, v in dist_items:
-                st.write(f"- {k}: {v}")
-
-        with st.expander("How scoring & confidence work (simple)"):
-            st.write("This app uses a **points system** to summarize the chart signals.")
-            st.write("- **+ points** = signals lean bullish")
-            st.write("- **0 points** = neutral / unclear")
-            st.write("- **− points** = signals lean bearish")
-            st.write("**Confidence** is based on the total score and reflects how **aligned** the signals are (not a guarantee).")
-
-        st.markdown("**Why this label (plain English):**")
-        for line in verdict.explanations:
-            st.write(f"- {line}")
-
-        with st.expander("How to read these indicators (simple guide)"):
-            st.write("- EMAs: EMA20/50 = short-term; EMA200 = bigger trend. A reclaim is stronger when slopes turn up too.")
-            st.write("- RSI: 50 is neutral; >55 supportive; <45 weak.")
-            st.write("- Stoch RSI: 20/80 are oversold/overbought. Crosses near those zones can signal turns.")
-            st.write("- Volume: above-average volume makes breakouts/breakdowns more believable.")
-            st.write("- Support/Resistance: Next = nearest level; Major = highest-strength zone from clustering.")
-
-# ---- layout ----
-if MOBILE:
-    render_chart_block()
-    st.divider()
-    render_right_panel()
-else:
-    left, right = st.columns([1.55, 1.05])
-    with left:
-        render_chart_block()
-    with right:
-        render_right_panel()
+    with st.expander("How to read these indicators (simple guide)"):
+        st.write("- EMAs: EMA20/50 = short-term; EMA200 = bigger trend. A reclaim is stronger when slopes turn up too.")
+        st.write("- RSI: 50 is neutral; >55 supportive; <45 weak.")
+        st.write("- Stoch RSI: 20/80 are oversold/overbought. Crosses near those zones can signal turns.")
+        st.write("- Volume: above-average volume makes breakouts/breakdowns more believable.")
+        st.write("- Support/Resistance: Next = nearest level; Major = highest-strength zone from clustering.")
 
 with st.expander("Debug (last 40 rows)"):
     cols = ["Open", "High", "Low", "Close", "Volume", "EMA20", "EMA50", "EMA200", "RSI", "%K", "%D", "SR_S", "SR_R"]
