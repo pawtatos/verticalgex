@@ -52,13 +52,25 @@ st.set_page_config(
 def _detect_mobile() -> bool:
     """Best-effort mobile heuristic.
     - Uses Streamlit screen width when available.
-    - Falls back to `?mobile=true` query param.
+    - Falls back to `?mobile=true` query param (supports both new and old Streamlit APIs).
     """
+    # 1) Screen width (only exists in some builds / custom frontends)
     w = st.session_state.get("_st_screen_width", None)
     if isinstance(w, (int, float)):
         return w <= 768
-    qp = st.query_params
-    if str(qp.get("mobile", "")).lower() in ("1", "true", "yes"):
+
+    # 2) Query params (Streamlit 1.30+: st.query_params, older: st.experimental_get_query_params)
+    try:
+        qp = st.query_params
+        mobile_flag = qp.get("mobile", "")
+    except Exception:
+        try:
+            qp = st.experimental_get_query_params()
+            mobile_flag = (qp.get("mobile", [""])[0] if isinstance(qp.get("mobile", ""), list) else qp.get("mobile", ""))
+        except Exception:
+            mobile_flag = ""
+
+    if str(mobile_flag).lower() in ("1", "true", "yes"):
         return True
     return False
 
@@ -69,24 +81,31 @@ st.markdown(
     """
 <style>
 @media (max-width: 768px) {
-  .block-container { padding-top: 0.75rem !important; padding-left: 0.9rem !important; padding-right: 0.9rem !important; }
-  h1 { font-size: 1.35rem !important; line-height: 1.2 !important; }
-  h2, h3 { font-size: 1.1rem !important; }
-  div[data-testid="stPlotlyChart"] { margin-top: -6px; }
+  .block-container { padding-top: 0.55rem !important; padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+  h1 { font-size: 1.25rem !important; line-height: 1.15 !important; }
+  h2, h3 { font-size: 1.02rem !important; }
+  div[data-testid="stPlotlyChart"] { margin-top: -4px; }
+  .js-plotly-plot .modebar { display: none !important; }
+  .js-plotly-plot .plotly .modebar { display: none !important; }
 }
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-st.markdown("""
-<style>
-/* move plotly toolbar down */
-.js-plotly-plot .modebar {
-    top: 30px !important;
-}
-</style>
-""", unsafe_allow_html=True)
+if not MOBILE:
+    st.markdown("""
+    <style>
+    /* move plotly toolbar down (desktop only) */
+    .js-plotly-plot .modebar {
+        top: 30px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+else:
+    # On mobile we keep the modebar hidden to avoid overlaps
+    pass
+
 
 st.markdown("""
 <style>
@@ -97,6 +116,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def top_nav(active: str = "analyzer"):
+    # Responsive top nav (2x2 on mobile, 1x4 on desktop)
     st.markdown(
         """
         <style>
@@ -107,42 +127,56 @@ def top_nav(active: str = "analyzer"):
             border-radius: 12px !important;
             font-weight: 850 !important;
             height: 42px !important;
+            padding: 0 10px !important;
+            white-space: nowrap !important;
           }
           .navbtn.active button {
             border: 2px solid rgba(80,170,255,0.95) !important;
             background: rgba(80,170,255,0.20) !important;
             box-shadow: inset 0 -4px 0 rgba(80,170,255,0.95) !important;
           }
+          @media (max-width: 768px) {
+            .navbtn button {
+              height: 34px !important;
+              font-size: 11px !important;
+              padding: 0 6px !important;
+              white-space: normal !important;
+              line-height: 1.05 !important;
+            }
+          }
         </style>
-        """,
-        unsafe_allow_html=True
+        """
+        , unsafe_allow_html=True
     )
 
-    c1, c2, c3, c4 = st.columns([1, 1, 1, 1], gap="small")
-
-    with c1:
-        st.markdown('<div class="navbtn %s">' % ("active" if active=="gex" else ""), unsafe_allow_html=True)
-        if st.button("GEX", use_container_width=True):
-            st.switch_page("app.py")
+    def _nav_button(label: str, page: str, key: str):
+        st.markdown('<div class="navbtn %s">' % ("active" if active==key else ""), unsafe_allow_html=True)
+        if st.button(label, use_container_width=True):
+            st.switch_page(page)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    with c2:
-        st.markdown('<div class="navbtn %s">' % ("active" if active=="lev" else ""), unsafe_allow_html=True)
-        if st.button("Leveraged Converter", use_container_width=True):
-            st.switch_page("pages/1_Leverage_Equivalence.py")
-        st.markdown("</div>", unsafe_allow_html=True)
+    if MOBILE:
+        r1c1, r1c2 = st.columns(2)
+        with r1c1:
+            _nav_button("GEX", "app.py", "gex")
+        with r1c2:
+            _nav_button("Leverage", "pages/1_Leverage_Equivalence.py", "lev")
 
-    with c3:
-        st.markdown('<div class="navbtn %s">' % ("active" if active=="dca" else ""), unsafe_allow_html=True)
-        if st.button("Synthetic Put DCA", use_container_width=True):
-            st.switch_page("pages/2_Synthetic_Put_DCA.py")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with c4:
-        st.markdown('<div class="navbtn %s">' % ("active" if active=="analyzer" else ""), unsafe_allow_html=True)
-        if st.button("Analyzer", use_container_width=True):
-            st.switch_page("pages/3_Analyzer.py")
-        st.markdown("</div>", unsafe_allow_html=True)
+        r2c1, r2c2 = st.columns(2)
+        with r2c1:
+            _nav_button("Put DCA", "pages/2_Synthetic_Put_DCA.py", "dca")
+        with r2c2:
+            _nav_button("Analyzer", "pages/3_Analyzer.py", "analyzer")
+    else:
+        c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
+        with c1:
+            _nav_button("GEX", "app.py", "gex")
+        with c2:
+            _nav_button("Leveraged Converter", "pages/1_Leverage_Equivalence.py", "lev")
+        with c3:
+            _nav_button("Synthetic Put DCA", "pages/2_Synthetic_Put_DCA.py", "dca")
+        with c4:
+            _nav_button("Analyzer", "pages/3_Analyzer.py", "analyzer")
 
 top_nav(active="analyzer")
 
@@ -1120,15 +1154,22 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
         legend=dict(
             orientation="h",
             yanchor="top",
-            y=0.995,      # inside plot area (prevents big reserved gap)
+            y=0.995,
             xanchor="left",
             x=0.01,
             bgcolor="rgba(0,0,0,0)",
             font=dict(size=12),
             tracegroupgap=6,
         ),
+        dragmode="pan",
     )
 
+    if MOBILE:
+        fig.update_layout(
+            height=560,
+            margin=dict(t=58, r=8, b=28, l=42),
+            legend=dict(font=dict(size=10), y=0.99),
+        )
 
     return fig
 
@@ -1152,26 +1193,6 @@ def scoring_chart(components: List[tuple]) -> go.Figure:
         showlegend=False,
         template="plotly_white",
     )
-    # Optional price ruler line (hover-driven; snaps to hovered Close)
-    if ruler_y is not None:
-        try:
-            yv = float(ruler_y)
-            fig.add_hline(
-                y=yv,
-                line_width=1,
-                line_dash="dot",
-                line_color="white",
-                opacity=0.9,
-                annotation_text=f"{yv:,.2f}",
-                annotation_position="right",
-                annotation_font=dict(color="white", size=12),
-                annotation_bgcolor="rgba(0,0,0,0.55)",
-                annotation_bordercolor="rgba(255,255,255,0.25)",
-                annotation_borderpad=3,
-            )
-        except Exception:
-            pass
-
     return fig
 
 # =========================
@@ -1298,12 +1319,14 @@ def render_chart_block():
     fig.update_layout(height=620 if MOBILE else 960)
 
     chart_config = {
-        "scrollZoom": True,
-        "displayModeBar": True,
+        "scrollZoom": False if MOBILE else True,
+        "displayModeBar": False if MOBILE else True,
         "displaylogo": False,
+        "responsive": True,
+        "doubleClick": False,
     }
     if MOBILE:
-        chart_config["modeBarButtonsToRemove"] = ["lasso2d", "select2d"]
+        chart_config["modeBarButtonsToRemove"] = ["zoom2d", "pan2d", "lasso2d", "select2d", "zoomIn2d", "zoomOut2d", "autoScale2d", "resetScale2d"]
 
     if plotly_events is None:
         st.plotly_chart(fig, use_container_width=True, config=chart_config)
