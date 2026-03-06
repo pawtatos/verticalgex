@@ -1154,27 +1154,45 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
         except Exception:
             pass
 
-    # --- Layout polish: remove "gap" by placing legend INSIDE the chart area ---
-    fig.update_layout(
-        margin=dict(t=70, r=20, b=40, l=60),
-        legend=dict(
-            orientation="h",
-            yanchor="top",
-            y=0.995,
-            xanchor="left",
-            x=0.01,
-            bgcolor="rgba(0,0,0,0)",
-            font=dict(size=12),
-            tracegroupgap=6,
-        ),
-        dragmode="pan",
-    )
-
+    # --- Final layout polish ---
+    # IMPORTANT: on mobile, keep a large top margin so the selector rows and legend
+    # live above the plot area instead of overlapping candles / EMA lines.
     if MOBILE:
+        # Push the control rows higher into the top margin
         fig.update_layout(
-            height=560,
-            margin=dict(t=58, r=8, b=28, l=42),
-            legend=dict(font=dict(size=10), y=0.99),
+            updatemenus=[
+                dict(range_menu, y=1.24, x=0.00, font=dict(size=9, color="black"), pad=dict(r=2, t=0)),
+                dict(candle_menu, y=1.13, x=0.00, font=dict(size=9, color="black"), pad=dict(r=2, t=0)),
+            ],
+            height=620,
+            margin=dict(t=148, r=8, b=28, l=42),
+            legend=dict(
+                orientation="h",
+                yanchor="top",
+                y=1.04,
+                xanchor="left",
+                x=0.01,
+                bgcolor="rgba(255,255,255,0.92)",
+                font=dict(size=9),
+                tracegroupgap=4,
+                itemwidth=30,
+            ),
+            dragmode="pan",
+        )
+    else:
+        fig.update_layout(
+            margin=dict(t=70, r=20, b=40, l=60),
+            legend=dict(
+                orientation="h",
+                yanchor="top",
+                y=0.995,
+                xanchor="left",
+                x=0.01,
+                bgcolor="rgba(0,0,0,0)",
+                font=dict(size=12),
+                tracegroupgap=6,
+            ),
+            dragmode="pan",
         )
 
     return fig
