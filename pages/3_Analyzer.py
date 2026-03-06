@@ -1,3 +1,15 @@
+
+st.markdown("""
+<style>
+@media (max-width: 768px) {
+  /* Hide plotly range slider / zoom bar on mobile */
+  g.rangeslider, .rangeslider-container, .plotly .rangeslider { display: none !important; }
+  /* Hide modebar just in case */
+  .js-plotly-plot .plotly .modebar { display: none !important; }
+}
+</style>
+""", unsafe_allow_html=True)
+
 import streamlit as st
 import pandas as pd
 import numpy as np
