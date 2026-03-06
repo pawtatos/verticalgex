@@ -1039,7 +1039,7 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
     vis_regular = [True, False, True] + [True] * max(0, n_traces - 3)
     vis_heikin  = [False, True, True] + [True] * max(0, n_traces - 3)
 
-    # Keep the range selector and candle selector on separate rows for mobile.
+    # Range selector removed to avoid mobile overlap issues; candle selector stays.
     range_menu = dict(
         type="buttons",
         direction="left",
@@ -1097,7 +1097,7 @@ def make_chart(df: pd.DataFrame, ruler_y: float | None = None) -> go.Figure:
         xaxis_rangeslider_visible=False,
         shapes=guide_shapes,
         annotations=annotations,
-        updatemenus=([candle_menu] if MOBILE else [range_menu, candle_menu]),
+        updatemenus=[candle_menu],
     )
 
     fig.update_xaxes(
