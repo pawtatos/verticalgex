@@ -11,12 +11,10 @@ def top_nav(active: str = "gex"):
     st.markdown(
         """
         <style>
-          /* Hide sidebar + built-in multipage nav */
           [data-testid="stSidebar"] { display: none; }
           [data-testid="stSidebarNav"] { display: none; }
           [data-testid="collapsedControl"] { display: none; }
 
-          /* Center the nav row so it matches your centered pages */
           .navwrap {
             max-width: 900px;
             margin: 0 auto;
@@ -48,12 +46,12 @@ def top_nav(active: str = "gex"):
         if st.button("GEX", use_container_width=True):
             st.switch_page("app.py")
         st.markdown("</div>", unsafe_allow_html=True)
-        
+
     with c2:
-        st.markdown('<div class="navbtn {}">'.format("active" if active=="gex" else ""), unsafe_allow_html=True)
+        st.markdown('<div class="navbtn {}">'.format("active" if active=="gex_mobile" else ""), unsafe_allow_html=True)
         if st.button("GEX Mobile", use_container_width=True):
-            st.switch_page("1_GEX_Mobile.py")
-        st.markdown("</div>", unsafe_allow_html=True)   
+            st.switch_page("pages/1_GEX_Mobile.py")
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with c3:
         st.markdown('<div class="navbtn {}">'.format("active" if active=="lev" else ""), unsafe_allow_html=True)
@@ -66,7 +64,7 @@ def top_nav(active: str = "gex"):
         if st.button("Synthetic Put DCA", use_container_width=True):
             st.switch_page("pages/3_Synthetic_Put_DCA.py")
         st.markdown("</div>", unsafe_allow_html=True)
-        
+
     with c5:
         st.markdown('<div class="navbtn {}">'.format("active" if active=="analyzer" else ""), unsafe_allow_html=True)
         if st.button("Analyzer", use_container_width=True):
