@@ -52,7 +52,7 @@ def top_nav(active: str = "gex"):
     with c2:
         st.markdown('<div class="navbtn {}">'.format("active" if active=="gex" else ""), unsafe_allow_html=True)
         if st.button("GEX Mobile", use_container_width=True):
-            st.switch_page("1_GEX_Mobile.py")
+            st.switch_page("pages/1_GEX_Mobile.py")
         st.markdown("</div>", unsafe_allow_html=True)   
 
     with c3:
@@ -988,6 +988,7 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
 
 
