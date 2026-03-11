@@ -70,9 +70,7 @@ def top_nav(active: str = "gex"):
         if st.button("Analyzer", use_container_width=True):
             st.switch_page("pages/4_Analyzer.py")
         st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
-                
+          
 # Optional auto-refresh
 try:
     from streamlit_autorefresh import st_autorefresh
