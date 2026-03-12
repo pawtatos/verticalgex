@@ -2,6 +2,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
+import requests
+import re
 from math import log, sqrt
 from scipy.stats import norm
 from options.data import get_options_view_df
@@ -137,8 +139,128 @@ if AUTOREFRESH_OK:
 # =========================
 # Cache: options chain
 # =========================
+CBOE_TIMEOUT = 12
+
+# Common symbol aliases for Cboe delayed quotes.
+CBOE_SYMBOL_MAP = {
+    "SPX": "_SPX",
+    "VIX": "_VIX",
+    "NDX": "_NDX",
+    "RUT": "_RUT",
+}
+
+def cboe_symbol(symbol: str) -> str:
+    s = str(symbol).upper().strip()
+    return CBOE_SYMBOL_MAP.get(s, s)
+
+def _extract_expiry_from_option_symbol(option_symbol: str):
+    m = re.search(r"(\d{6})([CP])(\d+)$", str(option_symbol))
+    if not m:
+        return None
+    yymmdd = m.group(1)
+    try:
+        return pd.to_datetime(yymmdd, format="%y%m%d").strftime("%Y-%m-%d")
+    except Exception:
+        return None
+
+def _extract_type_from_option_symbol(option_symbol: str):
+    s = str(option_symbol)
+    m = re.search(r"\d{6}([CP])\d+$", s)
+    if not m:
+        return None
+    return "call" if m.group(1) == "C" else "put"
+
+def _to_float(x, default=np.nan):
+    try:
+        if x is None or x == "":
+            return default
+        return float(str(x).replace(",", ""))
+    except Exception:
+        return default
+
+def _normalize_cboe_option_row(row: dict) -> dict:
+    option_symbol = (
+        row.get("option")
+        or row.get("option_symbol")
+        or row.get("symbol")
+        or row.get("contract_symbol")
+        or ""
+    )
+
+    option_type = (
+        row.get("option_type")
+        or row.get("type")
+        or _extract_type_from_option_symbol(option_symbol)
+    )
+
+    expiry = (
+        row.get("expire_date")
+        or row.get("expiration_date")
+        or row.get("expiry")
+        or row.get("expiration")
+        or _extract_expiry_from_option_symbol(option_symbol)
+    )
+
+    strike = row.get("strike")
+    oi = row.get("open_interest") or row.get("openInterest") or row.get("oi")
+    iv = (
+        row.get("imp_vol")
+        or row.get("iv")
+        or row.get("implied_volatility")
+        or row.get("impliedVolatility")
+    )
+
+    return {
+        "option_symbol": option_symbol,
+        "option_type": str(option_type).lower().strip() if option_type is not None else None,
+        "expire_date": expiry,
+        "strike": _to_float(strike),
+        "open_interest": _to_float(oi, default=0.0),
+        "imp_vol": iv,
+    }
+
+def fetch_chain_cboe(symbol: str) -> pd.DataFrame:
+    sym = cboe_symbol(symbol)
+    url = f"https://cdn.cboe.com/api/global/delayed_quotes/options/{sym}.json"
+
+    r = requests.get(
+        url,
+        timeout=CBOE_TIMEOUT,
+        headers={"User-Agent": "Mozilla/5.0"},
+    )
+    r.raise_for_status()
+    payload = r.json()
+
+    options_list = payload.get("data", {}).get("options")
+    if options_list is None:
+        options_list = payload.get("options")
+
+    if not options_list or not isinstance(options_list, list):
+        raise RuntimeError(f"No options returned from Cboe for {symbol}")
+
+    rows = [_normalize_cboe_option_row(x) for x in options_list]
+    df = pd.DataFrame(rows)
+
+    needed = ["option_type", "expire_date", "strike", "open_interest", "imp_vol"]
+    for col in needed:
+        if col not in df.columns:
+            df[col] = np.nan
+
+    df = df.dropna(subset=["strike", "expire_date"]).copy()
+    if df.empty:
+        raise RuntimeError(f"Cboe returned no usable rows for {symbol}")
+
+    return df
+
 @st.cache_data(ttl=300)
 def fetch_chain(symbol: str) -> pd.DataFrame:
+    try:
+        df = fetch_chain_cboe(symbol)
+        df.columns = [c.lower().strip().replace(" ", "_") for c in df.columns]
+        return df
+    except Exception:
+        pass
+
     _, raw = get_options_view_df(symbol)
     df = raw.copy()
     df.columns = [c.lower().strip().replace(" ", "_") for c in df.columns]
@@ -763,6 +885,7 @@ with left:
     with st.spinner("Updating data…"):
         spot = fetch_spot_yahoo(ticker)
         raw = fetch_chain(ticker)
+        st.caption("Chain source: Cboe delayed first, fallback second")
 
         need = ["option_type", "expire_date", "strike", "open_interest", "imp_vol"]
         missing = [c for c in need if c not in raw.columns]
