@@ -117,7 +117,7 @@ is_mobile = False if screen_w is None else screen_w <= 768
 # =========================
 DEFAULT_RISK_FREE = 0.05
 DEFAULT_MULTIPLIER = 100
-STRIKES_WINDOW_DEFAULT = 20
+STRIKES_WINDOW_DEFAULT = 25
 
 CHART_BG = "#2b2b2b"
 GRID_COLOR = "#3a3a3a"
