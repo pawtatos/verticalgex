@@ -831,7 +831,7 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
 
     title_df = pd.DataFrame({
         "x": [strike_domain[len(strike_domain) // 2] if strike_domain else ""],
-        "y": [abs_max * 1.12],
+        "y": [abs_max * 1.25],
         "t": [chart_title]
     })
 
