@@ -123,7 +123,7 @@ CHART_BG = "#2b2b2b"
 GRID_COLOR = "#3a3a3a"
 AXIS_TEXT = "#cfcfcf"
 TITLE_TEXT = "#e6e6e6"
-CHART_PADDING = {"left": 10, "right": 30, "top": 25, "bottom": 20}
+CHART_PADDING = {"left": 10, "right": 30, "top": 30, "bottom": 20}
 
 MONITOR_REFRESH_SECONDS = 30
 if AUTOREFRESH_OK:
