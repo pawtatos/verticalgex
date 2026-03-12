@@ -764,7 +764,7 @@ def render_chart(gex_all: pd.DataFrame, spot: float, chart_title: str):
         labelExpr="replace(format(datum.value, '~s'), 'k', 'K')",
     )
 
-    bars = alt.Chart(g).mark_bar(size=10).encode(
+    bars = alt.Chart(g).mark_bar(size=8).encode(
         x=alt.X(
             "strike_str:N",
             axis=alt.Axis(
