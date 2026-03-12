@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import requests
+import re
 import plotly.graph_objects as go
 import yfinance as yf
 import math
@@ -777,6 +779,174 @@ def build_verdict(
 
 
 # =========================
+# Cboe delayed options chain helpers
+# =========================
+CBOE_TIMEOUT = 12
+
+CBOE_SYMBOL_MAP = {
+    "SPX": "_SPX",
+    "VIX": "_VIX",
+    "NDX": "_NDX",
+    "RUT": "_RUT",
+}
+
+def cboe_symbol(symbol: str) -> str:
+    s = str(symbol).upper().strip()
+    return CBOE_SYMBOL_MAP.get(s, s)
+
+def _extract_expiry_from_option_symbol(option_symbol: str):
+    m = re.search(r"(\d{6})([CP])(\d+)$", str(option_symbol))
+    if not m:
+        return None
+    yymmdd = m.group(1)
+    try:
+        return pd.to_datetime(yymmdd, format="%y%m%d").strftime("%Y-%m-%d")
+    except Exception:
+        return None
+
+def _extract_type_from_option_symbol(option_symbol: str):
+    s = str(option_symbol)
+    m = re.search(r"\d{6}([CP])\d+$", s)
+    if not m:
+        return None
+    return "call" if m.group(1) == "C" else "put"
+
+def _to_float(x, default=np.nan):
+    try:
+        if x is None or x == "":
+            return default
+        return float(str(x).replace(",", ""))
+    except Exception:
+        return default
+
+def _normalize_cboe_option_row(row: dict) -> dict:
+    option_symbol = (
+        row.get("option")
+        or row.get("option_symbol")
+        or row.get("symbol")
+        or row.get("contract_symbol")
+        or ""
+    )
+
+    option_type = (
+        row.get("option_type")
+        or row.get("type")
+        or _extract_type_from_option_symbol(option_symbol)
+    )
+
+    expiry = (
+        row.get("expire_date")
+        or row.get("expiration_date")
+        or row.get("expiry")
+        or row.get("expiration")
+        or _extract_expiry_from_option_symbol(option_symbol)
+    )
+
+    strike = row.get("strike")
+    oi = row.get("open_interest") or row.get("openInterest") or row.get("oi")
+    iv = (
+        row.get("imp_vol")
+        or row.get("iv")
+        or row.get("implied_volatility")
+        or row.get("impliedVolatility")
+    )
+
+    return {
+        "option_symbol": option_symbol,
+        "option_type": str(option_type).lower().strip() if option_type is not None else None,
+        "expire_date": expiry,
+        "strike": _to_float(strike),
+        "open_interest": _to_float(oi, default=0.0),
+        "imp_vol": iv,
+    }
+
+@st.cache_data(ttl=300)
+def fetch_chain(symbol: str) -> pd.DataFrame:
+    last_err = None
+
+    try:
+        sym = cboe_symbol(symbol)
+        url = f"https://cdn.cboe.com/api/global/delayed_quotes/options/{sym}.json"
+        r = requests.get(
+            url,
+            timeout=CBOE_TIMEOUT,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        r.raise_for_status()
+        payload = r.json()
+
+        options_list = payload.get("data", {}).get("options")
+        if options_list is None:
+            options_list = payload.get("options")
+
+        if not options_list or not isinstance(options_list, list):
+            raise RuntimeError(f"No options returned from Cboe for {symbol}")
+
+        rows = [_normalize_cboe_option_row(x) for x in options_list]
+        df = pd.DataFrame(rows)
+        df.columns = [c.lower().strip().replace(" ", "_") for c in df.columns]
+
+        needed = ["option_type", "expire_date", "strike", "open_interest", "imp_vol"]
+        for col in needed:
+            if col not in df.columns:
+                df[col] = np.nan
+
+        df = df.dropna(subset=["strike", "expire_date"]).copy()
+        if df.empty:
+            raise RuntimeError(f"Cboe returned no usable rows for {symbol}")
+        return df
+
+    except Exception as e:
+        last_err = e
+
+    try:
+        tk = yf.Ticker(str(symbol).strip().upper())
+        expiries = list(getattr(tk, "options", []) or [])
+        rows = []
+
+        for exp in expiries:
+            try:
+                chain = tk.option_chain(exp)
+                for side_name, opt_type in (("calls", "call"), ("puts", "put")):
+                    side_df = getattr(chain, side_name, None)
+                    if side_df is None or side_df.empty:
+                        continue
+                    side_df = side_df.copy()
+                    side_df["option_type"] = opt_type
+                    side_df["expire_date"] = exp
+                    rows.append(side_df)
+            except Exception:
+                continue
+
+        if not rows:
+            raise RuntimeError(f"No option-chain rows returned from yfinance for {symbol}")
+
+        df = pd.concat(rows, ignore_index=True)
+        rename_map = {
+            "openInterest": "open_interest",
+            "impliedVolatility": "imp_vol",
+            "contractSymbol": "option_symbol",
+        }
+        df = df.rename(columns=rename_map)
+        df.columns = [c.lower().strip().replace(" ", "_") for c in df.columns]
+
+        needed = ["option_type", "expire_date", "strike", "open_interest", "imp_vol"]
+        for col in needed:
+            if col not in df.columns:
+                df[col] = np.nan
+
+        df = df.dropna(subset=["strike", "expire_date"]).copy()
+        if df.empty:
+            raise RuntimeError(f"yfinance returned no usable rows for {symbol}")
+        return df
+
+    except Exception as e:
+        raise RuntimeError(
+            f"Both Cboe delayed and yfinance fallback failed for {symbol}. "
+            f"Cboe error: {last_err}. Fallback error: {e}"
+        )
+
+# =========================
 # Data
 # =========================
 @st.cache_data(show_spinner=False)
@@ -1207,6 +1377,7 @@ with left:
     """,
     unsafe_allow_html=True
 )
+    st.caption("Options chain source available in code: Cboe delayed first, yfinance fallback")
     
     ruler_y = st.session_state.get("ruler_y")
     fig = make_chart(df, ruler_y=ruler_y)
