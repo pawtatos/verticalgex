@@ -129,7 +129,7 @@ CHART_BG = "#2b2b2b"
 GRID_COLOR = "#3a3a3a"
 AXIS_TEXT = "#cfcfcf"
 TITLE_TEXT = "#e6e6e6"
-CHART_PADDING = {"left": 20, "right": 30, "top": 20, "bottom": 20}
+CHART_PADDING = {"left": 10, "right": 10, "top": 20, "bottom": 20}
 
 MONITOR_REFRESH_SECONDS = 30
 if AUTOREFRESH_OK:
@@ -1111,6 +1111,7 @@ with right:
         chart_title = f"{ticker} - All expiries"
 
     render_chart(gex_all=gex_all, spot=spot, chart_title=chart_title)
+
 
 
 
