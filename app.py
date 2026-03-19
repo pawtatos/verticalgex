@@ -131,7 +131,7 @@ AXIS_TEXT = "#cfcfcf"
 TITLE_TEXT = "#e6e6e6"
 CHART_PADDING = {"left": 10, "right": 10, "top": 20, "bottom": 20}
 
-MONITOR_REFRESH_SECONDS = 30
+MONITOR_REFRESH_SECONDS = 90
 if AUTOREFRESH_OK:
     st_autorefresh(interval=MONITOR_REFRESH_SECONDS * 1000, key="monitor_autorefresh")
 
@@ -269,7 +269,7 @@ def fetch_chain(symbol: str) -> pd.DataFrame:
 # =========================
 # GS Ratio 
 # =========================
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=90, show_spinner=False)
 def fetch_ratio_snapshot(sym_num: str, sym_den: str) -> dict:
     a = fetch_change_snapshot(sym_num)
     b = fetch_change_snapshot(sym_den)
@@ -292,7 +292,7 @@ def fetch_ratio_snapshot(sym_num: str, sym_den: str) -> dict:
 # =========================
 # Yahoo spot + monitor snapshots
 # =========================
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=90, show_spinner=False)
 def fetch_spot_yahoo(symbol: str) -> float:
     if not YF_OK:
         raise RuntimeError("yfinance not installed")
@@ -330,7 +330,7 @@ def fetch_spot_yahoo(symbol: str) -> float:
     return v
 
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=90, show_spinner=False)
 def fetch_change_snapshot(symbol: str) -> dict:
     if not YF_OK:
         raise RuntimeError("yfinance not installed")
@@ -368,7 +368,7 @@ def fetch_change_snapshot(symbol: str) -> dict:
     return {"last": last, "prev_close": prev_close, "chg": chg, "chg_pct": chg_pct}
 
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=90, show_spinner=False)
 def build_monitor_table(items) -> pd.DataFrame:
     """
     items can be:
